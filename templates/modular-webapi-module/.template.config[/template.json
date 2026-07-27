@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Lasthy",
+  "classifications": [ "Web", "Web API", "API", "Project" ],
+  "identity": "Lasthy.ModularAPI.Module",
+  "name": "Modular API Module",
+  "shortName": "modular-webapi-module",
+  "sourceName":"MyModule",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}
