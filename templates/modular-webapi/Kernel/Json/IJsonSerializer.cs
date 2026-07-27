@@ -14,16 +14,16 @@ public interface IJsonSerializer
 	string Serialize(object obj);
 	
 	/// <summary>
-	///	Deserializes a string containing a json into a object of type T.
+	///	Deserializes a string containing a json into a object of type <typeparamref name="T"/>.
 	/// </summary>
 	/// <param name="json">The json string to be deserialized.</param>
-	/// <param name="T">The type which the json will deserialize into</param>
+	/// <typeparam name="T">The type which the json will deserialize into</typeparam>
 	/// <returns>A object of type T.</returns>
 	/// <exception cref="JsonDeserializationException"></exception>
     T Deserialize<T>(string json);
 	
 	/// <summary>
-	///	Deserializes a string containing a json into a object of type "type".
+	///	Deserializes a string containing a json into a object of type <paramref name="type"/>.
 	/// </summary>
 	/// <param name="json">The json string to be deserialized</param>
 	/// <param name="type">The type which the json will deserialize into</param>

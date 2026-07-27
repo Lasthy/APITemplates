@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cysharp.Serialization.Json;
 
 namespace Kernel.Json;
 
@@ -75,6 +76,8 @@ public class JsonSerializer : IJsonSerializer
     private static JsonSerializerOptions CreateSerializerOptions()
     {
         var options = new JsonSerializerOptions();
+		
+		options.Converters.Add(new UlidJsonConverter());
         options.WriteIndented = true;
 
         return options;
