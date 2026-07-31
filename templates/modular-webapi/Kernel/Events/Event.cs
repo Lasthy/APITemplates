@@ -1,9 +1,9 @@
 namespace Kernel.Events;
 
 /// <summary>
-/// Base type for domain events to implement.
+/// Base type for events to implement.
 /// </summary>
-public abstract record DomainEvent : IEvent
+public abstract record Event : IEvent
 {
 	/// <inheritdoc/>
     public DefaultId Id => DefaultId.NewUlid();
