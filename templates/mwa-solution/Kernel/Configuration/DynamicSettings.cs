@@ -13,3 +13,4 @@ public class DynamicSettings
 		SettingsChanged = true;
 	}
 }
+  

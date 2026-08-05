@@ -2,7 +2,6 @@ namespace Kernel.Common;
 
 public static class ResultExtensions
 {
-    // Async variants
     public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
         this Task<Result<TIn>> resultTask,
         Func<TIn, TOut> map)
@@ -22,7 +21,6 @@ public static class ResultExtensions
         return await bind(result.Value!);
     }
 
-    // Async — result is already resolved, callbacks may be async
     public static async Task<TOut> MatchAsync<T, TOut>(
         this Result<T> result,
         Func<T, Task<TOut>> onSuccess,
@@ -33,7 +31,6 @@ public static class ResultExtensions
             : await onFailure(result.Error!);
     }
 
-    // Most common async variant: awaiting the result itself
     public static async Task<TOut> MatchAsync<T, TOut>(
         this Task<Result<T>> resultTask,
         Func<T, TOut> onSuccess,
