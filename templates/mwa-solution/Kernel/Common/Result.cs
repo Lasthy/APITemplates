@@ -102,8 +102,10 @@ public record Result<T> : Result
     {
         Value = value;
     }
-	
-	// Transform the value inside a successful Result<T>
+
+    /// <summary>
+    /// Transform the value inside a successful Result<T>.
+    /// </summary>
     public Result<TOut> Map<TOut>(
         Func<T, TOut> map)
     {
@@ -113,7 +115,9 @@ public record Result<T> : Result
         return Result.Success(map(Value!));
     }
 
-    // Chain an operation that itself returns a Result (flatMap / SelectMany)
+    /// <summary>
+    /// Chain an operation that itself returns a Result.
+    /// </summary>
     public Result<TOut> Bind<TOut>(
         Func<T, Result<TOut>> bind)
     {

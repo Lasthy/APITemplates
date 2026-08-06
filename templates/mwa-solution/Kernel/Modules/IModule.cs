@@ -13,7 +13,7 @@ public interface IModule
     /// <summary>
     /// The module name, used as the identifier for the OpenAPI document.
     /// </summary>
-    static abstract string ModuleName { get; }
+    static abstract string Name { get; }
 
     /// <summary>
     /// Registers module services in the DI container.

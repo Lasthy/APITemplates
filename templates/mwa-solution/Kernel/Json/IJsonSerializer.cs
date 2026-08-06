@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Kernel.Json;
 
 /// <summary>
@@ -12,6 +14,7 @@ public interface IJsonSerializer
 	/// <returns>A string that represents the object in json format.</returns>
 	/// <exception cref="JsonSerializationException"></exception>
 	string Serialize(object obj);
+	JsonElement SerializeToElement(object obj);
 	
 	/// <summary>
 	///	Deserializes a string containing a json into a object of type <typeparamref name="T"/>.
