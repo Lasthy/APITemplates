@@ -82,4 +82,18 @@ public class JsonSerializer : IJsonSerializer
 
         return options;
     }
+
+    public JsonElement SerializeToElement(object obj)
+    {
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.SerializeToElement(obj, SerializerOptions);
+
+            return json;
+        }
+        catch (Exception e)
+        {
+            throw new JsonSerializationException(null, e);
+        }
+    }
 }

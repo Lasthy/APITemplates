@@ -1,6 +1,12 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Kernel.Extensions;
 
-public class WebApplicationBuilderExtensions
+public static class WebApplicationBuilderExtensions
 {
-
+    public static void AddKernel(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddOpenApi();
+    }
 }

@@ -1,5 +1,6 @@
 using Kernel.Json;
 using Kernel.Modules;
+using System.Xml.Linq;
 
 namespace Kernel.Configuration;
 
@@ -17,10 +18,25 @@ public class DynamicSettings
 		return _settings[name];
 	}
 
-	public void CreateSection(string source, string name)
+	public T GetSection<T>() where T : DynamicSettingsSection
 	{
-		_settings[name] = new DynamicSettingsSection(source, _jsonSerializer);
+		return (T)_settings[nameof(T)];
 	}
+
+	public DynamicSettingsSection CreateSection(string source, string name)
+	{
+		var section = new DynamicSettingsSection(source, _jsonSerializer);
+        _settings[name] = section;
+
+		return section;
+	}
+
+	public T AddSection<T>(T instance) where T : DynamicSettingsSection
+	{
+        _settings[typeof(T).Name] = instance;
+
+        return instance;
+    }
 	
 	public void CommitChanges() {
 		foreach(var (_, setting) in _settings) {

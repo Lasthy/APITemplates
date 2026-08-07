@@ -16,7 +16,7 @@ public interface IModule
     static abstract string Name { get; }
 
     /// <summary>
-    /// Registers module services in the DI container.
+    /// Registers module stuff in the DI container.
     /// </summary>
-    static abstract void RegisterServices(IServiceCollection services, IConfiguration configuration);
+    static abstract void Register(IServiceCollection services, IConfiguration configuration);
 }

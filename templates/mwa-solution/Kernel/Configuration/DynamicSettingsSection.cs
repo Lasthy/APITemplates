@@ -1,11 +1,15 @@
 using Kernel.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Kernel.Configuration;
 
 public class DynamicSettingsSection
 {
+	public bool IsReadonly { get; set; }
+	[JsonIgnore]
 	public bool SettingsChanged { get; private set; }
+	[JsonIgnore]
 	public string Source { get; private set; }
 
 	private Dictionary<string, JsonElement> _options { get; set; } = [];
@@ -21,6 +25,8 @@ public class DynamicSettingsSection
 	public T GetValue<T>(string key) => _options[key].Deserialize<T>()!;
 	
 	public void SetValue(string key, object value) {
+		if (IsReadonly) return;
+
 		_options[key] = _jsonSerializer.SerializeToElement(value);
 		
 		SettingsChanged = true;

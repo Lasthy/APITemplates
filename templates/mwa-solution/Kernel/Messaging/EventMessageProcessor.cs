@@ -2,12 +2,14 @@ using System.Transactions;
 using Kernel.Boxing;
 using Kernel.Common;
 using Kernel.Events;
+using Microsoft.Extensions.Logging;
 
 namespace Kernel.Messaging;
 
 public class EventMessageProcessor(
 	IEventBus _eventBus,
-	IEventTypeRegistry _registry
+	IEventTypeRegistry _registry,
+	ILogger<EventMessageProcessor> _logger
 ) : IMessageProcessor
 {
     public MessageChannel GetChannel()
@@ -18,6 +20,8 @@ public class EventMessageProcessor(
     public async Task<Result> ProcessMessage(Message message, CancellationToken cancellationToken = default)
     {
         try {
+			_logger.LogInformation("Processing message: Id: {}, Channel {}, Type: {}", message.Id, message.Channel, message.GetType());
+
 			using var transactionScope = new TransactionScope();
 			
 			var type = _registry.Resolve(message.Type);
@@ -30,11 +34,15 @@ public class EventMessageProcessor(
 			await _eventBus.PublishAsync(@event, cancellationToken);
 			
 			transactionScope.Complete();
-			
-			return Result.Success();
+
+            _logger.LogInformation("Processed message of Id {} successfully.", message.Id);
+
+            return Result.Success();
 		}
-		catch() {
+		catch(Exception e) {
+            _logger.LogInformation("Error while processing message of Id {}.", message.Id);
 			
-		}
+			return Result.Failure(e);
+        }
     }
 }
