@@ -3,8 +3,13 @@ using Microsoft.AspNetCore.Http;
 
 namespace Kernel.Context;
 
-public class WebScopeContext
-{private readonly ClaimsPrincipal? _user;
+/// <summary>
+/// HTTP-context-backed implementation of <see cref="IScopeContext"/>.
+/// Extracts user identity from the current <see cref="IHttpContextAccessor"/>.
+/// </summary>
+public class WebScopeContext : IScopeContext
+{
+    private readonly ClaimsPrincipal? _user;
     private IReadOnlyList<string>? _roles;
     private IReadOnlyDictionary<string, string>? _claims;
 
@@ -22,6 +27,7 @@ public class WebScopeContext
         _user = user;
     }
 
+    /// <inheritdoc/>
     public DefaultId? UserId
     {
         get
@@ -33,13 +39,16 @@ public class WebScopeContext
         }
     }
 
+    /// <summary>The display name of the authenticated user.</summary>
     public string? UserName =>
         _user?.FindFirstValue(ClaimTypes.Name)
         ?? _user?.FindFirstValue("name");
 
+    /// <inheritdoc/>
     public bool IsAuthenticated =>
         _user?.Identity?.IsAuthenticated ?? false;
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> Roles =>
         _roles ??= _user?.FindAll(ClaimTypes.Role)
             .Select(c => c.Value)
@@ -47,6 +56,7 @@ public class WebScopeContext
             .AsReadOnly()
         ?? [];
 
+    /// <inheritdoc/>
     public IReadOnlyDictionary<string, string> Claims =>
         _claims ??= _user?.Claims
             .GroupBy(c => c.Type)
@@ -54,9 +64,11 @@ public class WebScopeContext
             .AsReadOnly()
         ?? new Dictionary<string, string>().AsReadOnly();
 
+    /// <inheritdoc/>
     public string? GetClaim(string claimType) =>
         _user?.FindFirstValue(claimType);
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> GetClaimValues(string claimType) =>
         _user?.FindAll(claimType)
             .Select(c => c.Value)
@@ -64,6 +76,10 @@ public class WebScopeContext
             .AsReadOnly()
         ?? [];
 
+    /// <inheritdoc/>
     public bool IsInRole(string role) =>
         _user?.IsInRole(role) ?? false;
+
+    /// <inheritdoc/>
+    public bool IsSystem => IsInRole(Context.Roles.System);
 }

@@ -8,10 +8,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
-    <PackageReference Include="Microsoft.OpenApi" Version="3.9.0" />
+    <!-- OpenAPI viewer: Scalar (recommended) or Swagger UI — controlled by Api.OpenApiViewer in appsettings.json -->
+    <PackageReference Include="Scalar.AspNetCore" Version="2.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Kernel\Kernel.csproj" />
   </ItemGroup>
+
 </Project>

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,11 +13,19 @@ public interface IModule
 {
     /// <summary>
     /// The module name, used as the identifier for the OpenAPI document.
+    /// Must match the key used in <c>ActiveModules</c> in <c>appsettings.Instance.json</c>.
     /// </summary>
     static abstract string Name { get; }
 
     /// <summary>
-    /// Registers module stuff in the DI container.
+    /// Registers module services in the DI container.
+    /// Called during <c>builder.AddModules()</c> before the host is built.
     /// </summary>
     static abstract void Register(IServiceCollection services, IConfiguration configuration);
+
+    /// <summary>
+    /// Maps the module's HTTP endpoints onto the application route builder.
+    /// Called during <c>app.UseModules()</c> after the host is built.
+    /// </summary>
+    static abstract void MapEndpoints(IEndpointRouteBuilder app);
 }

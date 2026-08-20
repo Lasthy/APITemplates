@@ -44,4 +44,10 @@ public interface IScopeContext
     /// Checks whether the user belongs to the specified role.
     /// </summary>
     bool IsInRole(string role);
+
+    /// <summary>
+    /// Indicates whether the current user holds the <see cref="Roles.System"/> role,
+    /// granting unrestricted access to all kernel-level and administrative operations.
+    /// </summary>
+    bool IsSystem { get; }
 }

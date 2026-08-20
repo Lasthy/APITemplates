@@ -2,47 +2,57 @@ using System.Transactions;
 using Kernel.Boxing;
 using Kernel.Common;
 using Kernel.Events;
+using Kernel.Json;
 using Microsoft.Extensions.Logging;
 
 namespace Kernel.Messaging;
 
+/// <summary>
+/// Processes <see cref="MessageChannel.Event"/> messages from the outbox.
+/// Deserializes the message content, resolves the event type, and publishes to <see cref="IEventBus"/>.
+/// </summary>
 public class EventMessageProcessor(
-	IEventBus _eventBus,
-	IEventTypeRegistry _registry,
-	ILogger<EventMessageProcessor> _logger
+    IEventBus _eventBus,
+    IEventTypeRegistry _registry,
+    IJsonSerializer _jsonSerializer,
+    ILogger<EventMessageProcessor> _logger
 ) : IMessageProcessor
 {
-    public MessageChannel GetChannel()
-    {
-        return MessageChannel.Event;
-    }
+    public MessageChannel GetChannel() => MessageChannel.Event;
 
     public async Task<Result> ProcessMessage(Message message, CancellationToken cancellationToken = default)
     {
-        try {
-			_logger.LogInformation("Processing message: Id: {}, Channel {}, Type: {}", message.Id, message.Channel, message.GetType());
+        try
+        {
+            _logger.LogInformation(
+                "Processing message: Id={MessageId}, Channel={Channel}, Type={Type}",
+                message.Id, message.Channel, message.Type);
 
-			using var transactionScope = new TransactionScope();
-			
-			var type = _registry.Resolve(message.Type);
-			var @event = Activator.CreateInstance(type) as IEvent;
-			
-			if(@event is null) {
-				return Result.Failure(new Exception());
-			}
-			
-			await _eventBus.PublishAsync(@event, cancellationToken);
-			
-			transactionScope.Complete();
+            using var transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
-            _logger.LogInformation("Processed message of Id {} successfully.", message.Id);
+            var type = _registry.Resolve(message.Type);
+            var @event = _jsonSerializer.Deserialize(message.Content, type) as IEvent;
+
+            if (@event is null)
+            {
+                return Result.Failure(
+                    new InvalidOperationException(
+                        $"Message {message.Id} content could not be deserialized to IEvent (type: {message.Type})."));
+            }
+
+            await _eventBus.PublishAsync(@event, cancellationToken);
+
+            transactionScope.Complete();
+
+            _logger.LogInformation("Processed message Id={MessageId} successfully.", message.Id);
 
             return Result.Success();
-		}
-		catch(Exception e) {
-            _logger.LogInformation("Error while processing message of Id {}.", message.Id);
-			
-			return Result.Failure(e);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error while processing message Id={MessageId}.", message.Id);
+
+            return Result.Failure(e);
         }
     }
 }
