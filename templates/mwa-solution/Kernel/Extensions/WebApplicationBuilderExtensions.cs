@@ -1,5 +1,6 @@
 using Kernel.Boxing;
 using Kernel.Configuration;
+using Kernel.Configuration.Endpoints;
 using Kernel.Context;
 using Kernel.Events;
 using Kernel.Json;
@@ -7,6 +8,8 @@ using Kernel.Messaging;
 using Kernel.Modules;
 using Kernel.Partitioning;
 using Kernel.Persistence;
+using Kernel.Persistence.Extensions;
+using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,13 +55,27 @@ public static class WebApplicationBuilderExtensions
         // ── Event infrastructure ──────────────────────────────────────────────
         builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
         builder.Services.AddSingleton<IEventTypeRegistry, EventTypeRegistry>();
+        builder.Services.AddSingleton(new ModuleRegistry());
 
-        // ── Instance settings (loaded from appsettings.Instance.json) ─────────
+        // ── Dynamic Settings ──────────────────────────────────────────────────
+        var dynamicSettings = new DynamicSettings(new JsonSerializer());
+        builder.Services.AddSingleton(dynamicSettings);
+
+        builder.Services.AddSingleton<AppSettings>(sp =>
+        {
+            var ds = sp.GetRequiredService<DynamicSettings>();
+            var json = sp.GetRequiredService<IJsonSerializer>();
+            // Only add if not already added (e.g. by another initialization step)
+            try { return ds.GetSection<AppSettings>(); }
+            catch { return ds.AddSection(new AppSettings("appsettings.json", json)); }
+        });
+
         builder.Services.AddSingleton<InstanceSettings>(sp =>
         {
-            var jsonSerializer = sp.GetRequiredService<IJsonSerializer>();
-            var dynamicSettings = new DynamicSettings(jsonSerializer);
-            return dynamicSettings.AddSection(new InstanceSettings("appsettings.Instance.json", jsonSerializer));
+            var ds = sp.GetRequiredService<DynamicSettings>();
+            var json = sp.GetRequiredService<IJsonSerializer>();
+            try { return ds.GetSection<InstanceSettings>(); }
+            catch { return ds.AddSection(new InstanceSettings("appsettings.Instance.json", json)); }
         });
 
         // ── Partition manager ─────────────────────────────────────────────────
@@ -76,6 +93,23 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddSingleton(apiSettings);
 
+        // ── Configuration Endpoints Requests ──────────────────────────────────
+        builder.Services.AddScoped<IDispatcher, Dispatcher>();
+        builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.GetSettingsRequest, string>, Kernel.Configuration.Requests.GetSettingsRequestHandler>();
+        builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.UpdateSettingsRequest, bool>, Kernel.Configuration.Requests.UpdateSettingsRequestHandler>();
+
+        // ── Database / Persistence ────────────────────────────────────────────
+        var databaseOptions = builder.Configuration
+            .GetSection(DatabaseOptions.SectionName)
+            .Get<DatabaseOptions>() ?? new DatabaseOptions();
+        
+        builder.Services.AddSingleton(databaseOptions);
+        
+        builder.Services.AddDbContext<KernelDbContext>(options =>
+        {
+            options.UseConfiguredDatabase(databaseOptions.Provider, databaseOptions.ConnectionString);
+        });
+
         // ── OpenAPI — kernel document ─────────────────────────────────────────
         builder.Services.AddOpenApi("kernel");
     }
@@ -91,9 +125,12 @@ public static class WebApplicationBuilderExtensions
     /// </remarks>
     public static void UseKernel(this WebApplication app)
     {
-        // Expose the raw kernel OpenAPI JSON document.
-        app.MapOpenApi("/openapi/kernel.json")
-           .WithGroupName("kernel");
+        // Expose the OpenAPI JSON documents globally. 
+        // In .NET 9, a single call to MapOpenApi() registers the /openapi/{documentName}.json route
+        // which dynamically resolves any document added via AddOpenApi(documentName).
+        app.MapOpenApi();
+
+        app.MapSettingsEndpoints();
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
+using Kernel.Common;
+
 namespace Kernel.Requests;
 
-public interface IRequest
+public interface IRequest<TResponse>
 {
-
 }

@@ -22,6 +22,16 @@ public class MyModuleModule : IModule
     public static string Name => "MyModule";
 
     /// <summary>
+    /// Registers authorization policies for the module.
+    /// </summary>
+    public static void RegisterPolicies(Microsoft.AspNetCore.Authorization.AuthorizationOptions options)
+    {
+        // TODO: Register module-specific authorization policies here.
+        // Example:
+        //   options.AddPolicy("MyModuleAdmin", policy => policy.RequireRole("MyModuleAdmin"));
+    }
+
+    /// <summary>
     /// Registers module-specific services in the DI container.
     /// Called during <c>builder.AddModules()</c>.
     /// </summary>

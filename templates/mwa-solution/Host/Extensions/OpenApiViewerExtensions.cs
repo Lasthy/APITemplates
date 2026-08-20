@@ -40,17 +40,17 @@ public static class OpenApiViewerExtensions
                 {
                     options.Title = "API Reference";
 
-                    // Kernel document
-                    options.AddDocument("Kernel", "/openapi/kernel.json");
+                    var documentNames = new List<string> { "kernel" };
 
-                    // Per-module documents
                     if (moduleRegistry != null)
                     {
                         foreach (var module in moduleRegistry.Modules)
                         {
-                            options.AddDocument(module.Name, $"/openapi/{module.Name}.json");
+                            documentNames.Add(module.Name);
                         }
                     }
+
+                    options.AddDocuments(documentNames);
                 });
             }
         }

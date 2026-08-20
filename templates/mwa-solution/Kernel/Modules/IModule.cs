@@ -24,6 +24,11 @@ public interface IModule
     static abstract void Register(IServiceCollection services, IConfiguration configuration);
 
     /// <summary>
+    /// Registers authorization policies for the module.
+    /// </summary>
+    static abstract void RegisterPolicies(Microsoft.AspNetCore.Authorization.AuthorizationOptions options);
+
+    /// <summary>
     /// Maps the module's HTTP endpoints onto the application route builder.
     /// Called during <c>app.UseModules()</c> after the host is built.
     /// </summary>

@@ -373,7 +373,7 @@ Kernel/Host administrative operations that should only be accessible to system-l
 
 ### Naming
 - **Identifiers** are always `DefaultId` (= `Ulid`). Never use `Guid`, `int`, or `string` for entity IDs.
-- **Namespaces** follow the folder structure under `Kernel.*` (exception: `Kernel/Messaging/` uses `Kernel.Boxing` namespace for the `Message` entity and related types).
+- **Namespaces** follow the folder structure.
 - **Extension methods** for `WebApplicationBuilder` go in files named `WebApplicationBuilderExtensions.cs` within their feature folder.
 
 ### Patterns

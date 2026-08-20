@@ -14,13 +14,15 @@ public class DynamicSettings
         _jsonSerializer = jsonSerializer;
     }
 
+    public IEnumerable<string> GetSectionNames() => _settings.Keys;
+
     public DynamicSettingsSection GetSection(string name) {
 		return _settings[name];
 	}
 
 	public T GetSection<T>() where T : DynamicSettingsSection
 	{
-		return (T)_settings[nameof(T)];
+		return (T)_settings[typeof(T).Name];
 	}
 
 	public DynamicSettingsSection CreateSection(string source, string name)

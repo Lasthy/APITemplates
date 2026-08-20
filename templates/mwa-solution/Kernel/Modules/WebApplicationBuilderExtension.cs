@@ -24,10 +24,20 @@ public static class WebApplicationBuilderExtension
     /// </exception>
     public static void AddModules(this WebApplicationBuilder builder)
     {
-        var jsonSerializer = new JsonSerializer();
-        var dynamicSettings = new DynamicSettings(jsonSerializer);
+        var dynamicSettings = builder.Services
+            .Where(d => d.ServiceType == typeof(DynamicSettings))
+            .Select(d => d.ImplementationInstance as DynamicSettings)
+            .FirstOrDefault();
 
-        var instanceSettings = dynamicSettings.AddSection(new InstanceSettings("appsettings.Instance.json", jsonSerializer));
+        if (dynamicSettings == null)
+        {
+            throw new ApplicationException("DynamicSettings not found in DI. Did you call AddKernel() before AddModules()?");
+        }
+
+        var jsonSerializer = new JsonSerializer();
+        InstanceSettings instanceSettings;
+        try { instanceSettings = dynamicSettings.GetSection<InstanceSettings>(); }
+        catch { instanceSettings = dynamicSettings.AddSection(new InstanceSettings("appsettings.Instance.json", jsonSerializer)); }
 
         var modules = instanceSettings.ActiveModules;
         var addModuleMethod = typeof(WebApplicationBuilderExtension)
@@ -76,6 +86,26 @@ public static class WebApplicationBuilderExtension
     /// </summary>
     public static void AddModule<T>(this WebApplicationBuilder builder) where T : IModule
     {
+        // Load module specific settings
+        var dynamicSettings = builder.Services
+            .Where(d => d.ServiceType == typeof(DynamicSettings))
+            .Select(d => d.ImplementationInstance as DynamicSettings)
+            .FirstOrDefault();
+            
+        if (dynamicSettings != null)
+        {
+            var settingsPath = $"appsettings.{T.Name}.json";
+            if (File.Exists(settingsPath))
+            {
+                var jsonSerializer = new JsonSerializer();
+                var moduleSettings = new DynamicSettingsSection(settingsPath, jsonSerializer);
+                dynamicSettings.CreateSection(settingsPath, T.Name);
+            }
+        }
+
+        // Register module authorization policies
+        builder.Services.AddAuthorization(options => T.RegisterPolicies(options));
+
         // Register module services.
         T.Register(builder.Services, builder.Configuration);
 
@@ -86,7 +116,16 @@ public static class WebApplicationBuilderExtension
         RegisterEventHandlers(builder.Services, typeof(T).Assembly);
 
         // Record in the ModuleRegistry for post-build MapEndpoints and event type wiring.
-        var registry = GetOrAddModuleRegistry(builder.Services);
+        var registry = builder.Services
+            .Where(d => d.ServiceType == typeof(ModuleRegistry))
+            .Select(d => d.ImplementationInstance as ModuleRegistry)
+            .FirstOrDefault();
+
+        if (registry == null)
+        {
+            throw new ApplicationException("ModuleRegistry not found in DI. Did you call AddKernel() before AddModules()?");
+        }
+
         registry.Register(new ModuleDescriptor(
             Name: T.Name,
             Assembly: typeof(T).Assembly,
@@ -114,10 +153,6 @@ public static class WebApplicationBuilderExtension
 
             // Map module endpoints.
             module.MapEndpoints(app);
-
-            // Expose the module's OpenAPI document.
-            app.MapOpenApi($"/openapi/{module.Name}.json")
-               .WithGroupName(module.Name);
         }
     }
 
@@ -148,22 +183,4 @@ public static class WebApplicationBuilderExtension
         }
     }
 
-    /// <summary>
-    /// Retrieves the <see cref="ModuleRegistry"/> from the service collection,
-    /// registering it as a singleton if not already present.
-    /// </summary>
-    private static ModuleRegistry GetOrAddModuleRegistry(IServiceCollection services)
-    {
-        // Try to find an existing singleton instance descriptor.
-        var existing = services
-            .Where(d => d.ServiceType == typeof(ModuleRegistry))
-            .Select(d => d.ImplementationInstance as ModuleRegistry)
-            .FirstOrDefault(r => r != null);
-
-        if (existing != null) return existing;
-
-        var registry = new ModuleRegistry();
-        services.AddSingleton(registry);
-        return registry;
-    }
 }
