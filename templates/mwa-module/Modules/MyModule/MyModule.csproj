@@ -11,13 +11,13 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <!--
-    Add a ProjectReference to the Kernel here. The path below assumes the default
-    solution structure (Modules/{ModuleName}/ relative to the solution root):
+  <ItemGroup>
+    <ProjectReference Include="../../Kernel/Kernel.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="../../Kernel/Kernel.csproj" />
-    </ItemGroup>
-  -->
+  <!-- Include settings files in the build output so the Host can load them at runtime. -->
+  <ItemGroup>
+    <Content Include="settings.*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

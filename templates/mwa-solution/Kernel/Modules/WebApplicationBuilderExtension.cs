@@ -15,7 +15,7 @@ namespace Kernel.Modules;
 public static class WebApplicationBuilderExtension
 {
     /// <summary>
-    /// Discovers and registers all active modules from <c>appsettings.Instance.json</c>.
+    /// Discovers and registers all active modules from <c>settings.Instance.json</c>.
     /// For each active module it calls <see cref="AddModule{T}"/>, which registers module
     /// services, per-module OpenAPI document, and event handlers.
     /// </summary>
@@ -34,10 +34,14 @@ public static class WebApplicationBuilderExtension
             throw new ApplicationException("DynamicSettings not found in DI. Did you call AddKernel() before AddModules()?");
         }
 
-        var jsonSerializer = new JsonSerializer();
         InstanceSettings instanceSettings;
         try { instanceSettings = dynamicSettings.GetSection<InstanceSettings>(); }
-        catch { instanceSettings = dynamicSettings.AddSection(new InstanceSettings("appsettings.Instance.json", jsonSerializer)); }
+        catch
+        {
+            var jsonSerializer = new JsonSerializer();
+            instanceSettings = dynamicSettings.AddSection(
+                new InstanceSettings(jsonSerializer, dynamicSettings.Environment));
+        }
 
         var modules = instanceSettings.ActiveModules;
         var addModuleMethod = typeof(WebApplicationBuilderExtension)
@@ -78,6 +82,8 @@ public static class WebApplicationBuilderExtension
     /// <summary>
     /// Registers a single module of type <typeparamref name="T"/>:
     /// <list type="bullet">
+    ///   <item>Loads module settings from <c>settings.{ModuleName}.json</c>.</item>
+    ///   <item>Auto-discovers <see cref="DynamicSettingsSection"/> subclasses in the module assembly.</item>
     ///   <item>Calls <see cref="IModule.Register"/> to register module services.</item>
     ///   <item>Registers a named OpenAPI document for the module.</item>
     ///   <item>Scans and registers all <see cref="IEventHandler{TEvent}"/> implementations.</item>
@@ -86,7 +92,7 @@ public static class WebApplicationBuilderExtension
     /// </summary>
     public static void AddModule<T>(this WebApplicationBuilder builder) where T : IModule
     {
-        // Load module specific settings
+        // Load module-specific settings
         var dynamicSettings = builder.Services
             .Where(d => d.ServiceType == typeof(DynamicSettings))
             .Select(d => d.ImplementationInstance as DynamicSettings)
@@ -94,12 +100,20 @@ public static class WebApplicationBuilderExtension
             
         if (dynamicSettings != null)
         {
-            var settingsPath = $"appsettings.{T.Name}.json";
-            if (File.Exists(settingsPath))
+            var jsonSerializer = new JsonSerializer();
+            var environment = dynamicSettings.Environment;
+
+            // Auto-discover DynamicSettingsSection subclasses in the module assembly
+            RegisterModuleSettingsSections(dynamicSettings, typeof(T).Assembly, jsonSerializer, environment);
+
+            // Fall back: if no custom section was found, create a generic one for the module
+            var settingsPath = $"settings.{T.Name}.json";
+            if (!dynamicSettings.GetSectionNames().Any(n =>
+                    string.Equals(n, T.Name, StringComparison.OrdinalIgnoreCase)) &&
+                File.Exists(settingsPath))
             {
-                var jsonSerializer = new JsonSerializer();
-                var moduleSettings = new DynamicSettingsSection(settingsPath, jsonSerializer);
-                dynamicSettings.CreateSection(settingsPath, T.Name);
+                var moduleSettings = new GenericModuleSettings(T.Name, settingsPath, jsonSerializer, environment);
+                dynamicSettings.AddSection(moduleSettings);
             }
         }
 
@@ -157,6 +171,35 @@ public static class WebApplicationBuilderExtension
     }
 
     // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Scans a module assembly for concrete <see cref="DynamicSettingsSection"/> subclasses
+    /// and registers them into <see cref="DynamicSettings"/>.
+    /// </summary>
+    private static void RegisterModuleSettingsSections(
+        DynamicSettings dynamicSettings,
+        Assembly assembly,
+        IJsonSerializer jsonSerializer,
+        string? environment)
+    {
+        var sectionTypes = assembly.GetTypes()
+            .Where(t =>
+                !t.IsAbstract &&
+                t.IsSubclassOf(typeof(DynamicSettingsSection)))
+            .ToList();
+
+        foreach (var sectionType in sectionTypes)
+        {
+            // Try to construct with (IJsonSerializer, string?) signature
+            var instance = Activator.CreateInstance(sectionType, jsonSerializer, environment)
+                as DynamicSettingsSection;
+
+            if (instance != null)
+            {
+                dynamicSettings.AddSection(instance);
+            }
+        }
+    }
 
     private static void RegisterEventHandlers(IServiceCollection services, Assembly assembly)
     {

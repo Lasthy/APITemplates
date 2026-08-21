@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Register all cross-cutting Kernel services (JSON, context, events, messaging, OpenAPI).
 builder.AddKernel();
 
-// Discover and register all active modules from appsettings.Instance.json.
+// Discover and register all active modules from settings.Instance.json.
 builder.AddModules();
 
 var app = builder.Build();

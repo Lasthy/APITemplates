@@ -5,7 +5,7 @@ namespace Kernel.Partitioning;
 /// <summary>
 /// Default implementation of <see cref="IPartitionManager"/>.
 /// Generates a random partition number within the range owned by this instance,
-/// as configured in <c>appsettings.Instance.json</c> → <c>InstanceSettings.Partition</c>.
+/// as configured in <c>settings.Instance.json</c> → <c>InstanceSettings.Partition</c>.
 /// </summary>
 public class PartitionManager : IPartitionManager
 {
@@ -30,7 +30,7 @@ public class PartitionManager : IPartitionManager
         {
             throw new InvalidOperationException(
                 $"Invalid partition range configured: Start ({start}) > End ({end}). " +
-                $"Check InstanceSettings in appsettings.Instance.json.");
+                $"Check InstanceSettings in settings.Instance.json.");
         }
 
         // Random.Shared is thread-safe in .NET 6+.

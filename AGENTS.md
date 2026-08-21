@@ -42,8 +42,8 @@ Solution Root (MyAPI.slnx)
 ### Key Design Principles
 
 - **Kernel owns all cross-cutting concerns.** Modules depend on Kernel; Kernel never depends on modules.
-- **Modules are self-contained projects.** Each module has its own `appsettings.json` and implements `IModule` for DI registration.
-- **Module activation is config-driven.** The `InstanceSettings` section in the host's `appsettings.Instance.json` has an `ActiveModules` dictionary (`{ "ModuleName": true/false }`) controlling which modules are loaded at startup.
+- **Modules are self-contained projects.** Each module has its own `settings.{ModuleName}.json` and implements `IModule` for DI registration.
+- **Module activation is config-driven.** The `InstanceSettings` section in `settings.Instance.json` has an `ActiveModules` dictionary (`{ "ModuleName": true/false }`) controlling which modules are loaded at startup.
 - **`DefaultId` is `System.Ulid` everywhere.** Defined in `GlobalUsings.Shared.cs` and propagated to all projects via `Directory.Build.props`.
 
 ---
@@ -58,9 +58,11 @@ The executable ASP.NET web application. This is the composition root.
 |---|---|
 | `Program.cs` | Calls `builder.AddKernel()`, `builder.AddModules()`, `app.UseKernel()`, `app.UseModules()`, and mounts the OpenAPI viewer UI. |
 | `Host.csproj` | Web SDK project, references Kernel. Includes `Scalar.AspNetCore` and `Swashbuckle.AspNetCore`. |
-| `appsettings.json` | Main application settings — host, kernel, and `Api` section (OpenAPI viewer choice). |
-| `appsettings.{Environment}.json` | Environment-specific overrides. |
-| `appsettings.Instance.json` | Per-instance: partition range, active modules dictionary. |
+| `appsettings.json` | ASP.NET built-in configuration — logging, allowed hosts, `Api` section (OpenAPI viewer choice), `Database` section. |
+| `appsettings.{Environment}.json` | ASP.NET environment-specific overrides (logging levels, etc.). |
+| `settings.Application.json` | Dynamic settings for the application: `Environment`, `PartitionAmount`. |
+| `settings.Application.{Environment}.json` | Optional environment overlay for application settings. |
+| `settings.Instance.json` | Per-instance dynamic settings: partition range, active modules dictionary. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -73,9 +75,10 @@ app.UseModules();         // Map module endpoints + /openapi/{module}.json + eve
 ```
 
 **Configuration strategy:**
-- The **main `appsettings.json`** contains host-level settings: logging, allowed hosts, `Api.OpenApiViewer`.
-- An **`appsettings.Instance.json`** (read by `InstanceSettings`) contains per-instance config: partition range, active modules.
-- Each **module has its own `appsettings.json`** for module-specific configuration.
+- The **main `appsettings.json`** is used by ASP.NET's built-in `IConfiguration` for static host-level settings: logging, allowed hosts, `Api.OpenApiViewer`, `Database`.
+- **`settings.Application.json`** (read by `ApplicationSettings`) contains runtime-mutable application settings with optional `settings.Application.{Environment}.json` overlays.
+- **`settings.Instance.json`** (read by `InstanceSettings`) contains per-instance config: partition range, active modules.
+- Each **module has its own `settings.{ModuleName}.json`** with optional `settings.{ModuleName}.{Environment}.json` overlays for module-specific configuration.
 
 ### Kernel (`templates/mwa-solution/Kernel/`)
 
@@ -98,16 +101,39 @@ A railway-oriented result pattern for operation outcomes.
 > **Convention:** All operations should return `Result` or `Result<T>`. Never throw exceptions for expected failures — wrap them in `Result.Failure()`.
 
 #### Dynamic Configuration (`Kernel/Configuration/`)
-A runtime-mutable settings system that reads from JSON files and can write changes back.
+A runtime-mutable, convention-based settings system that reads from JSON files, supports environment overlays, auto-persists changes, and raises events on mutation.
 
-- **`DynamicSettingsSection`** — Reads a JSON file into a `Dictionary<string, JsonElement>`, exposes `GetValue<T>(key)` / `SetValue(key, value)`. Tracks `SettingsChanged`. Has `IsReadonly` guard and `Source` (file path).
-- **`DynamicSettings`** — Registry of named `DynamicSettingsSection` instances. `CreateSection(source, name)`, `AddSection<T>(instance)`, `GetSection<T>()`. `CommitChanges()` persists all dirty sections back to their source files.
-- **`AppSettings`** — Section exposing `Environment` and `PartitionAmount`.
-- **`InstanceSettings`** — Section exposing `Partition` (start/end range) and `ActiveModules` dictionary.
+**File naming convention:** `settings.{SectionName}.json` (base) with optional `settings.{SectionName}.{Environment}.json` (environment overlay). Environment values override base values; writes always go to the base file.
 
-> **Convention:** When adding new global settings, extend `AppSettings`. For per-instance settings (partition, modules), extend `InstanceSettings`. Module-specific settings should be their own `DynamicSettingsSection` subclass pointing at the module's `appsettings.json`.
+- **`DynamicSettingsSection`** — Abstract base class. Subclasses declare `SectionName` and expose strongly-typed properties via `GetValue<T>(key)` / `SetValue(key, value)`. Has `IsReadonly` guard, `Source` (base file path), `EnvironmentSource` (overlay path), `HasPendingChanges`, `TryGetValue<T>()`, and `Save()`. `SetValue()` auto-persists to the source file and raises `OnSettingsChanged`.
+- **`DynamicSettings`** — Singleton registry of `DynamicSettingsSection` instances, keyed by `SectionName`. `AddSection<T>(instance)`, `GetSection<T>()`, `GetSection(name)`, `CommitChanges()`. When an `IEventBus` is wired (via `SetEventBus()` in `UseKernel()`), every value change automatically publishes a `SettingsChangedEvent`.
+- **`SettingsChangedEvent`** — `record(SectionName, Key) : Event`. Published via `IEventBus` whenever any section value changes. Subscribe with `IEventHandler<SettingsChangedEvent>` to react to configuration changes.
+- **`ApplicationSettings`** — `SectionName = "Application"`. Loaded from `settings.Application.json`. Exposes `Environment` and `PartitionAmount`.
+- **`InstanceSettings`** — `SectionName = "Instance"`. Loaded from `settings.Instance.json`. Exposes `Partition` (start/end range) and `ActiveModules` dictionary.
+- **`GenericModuleSettings`** — Internal fallback for modules that don't define a custom `DynamicSettingsSection` subclass. `SectionName` is set to the module name.
 
-> **WIP:** Change events are not yet implemented — the system needs to raise events when settings are modified so consumers can react.
+> **Convention:** To add new settings, create a class inheriting from `DynamicSettingsSection`, declare `SectionName`, and expose properties using `GetValue<T>(nameof(Property))`. The system automatically loads the file `settings.{SectionName}.json` with optional `settings.{SectionName}.{Environment}.json` overlay. For modules, place custom `DynamicSettingsSection` subclasses in the module assembly — they are auto-discovered and registered during `AddModule<T>()`.
+
+**Example — creating a custom settings section:**
+```csharp
+public class PaymentSettings : DynamicSettingsSection
+{
+    public override string SectionName => "Payment";
+
+    public string Gateway => GetValue<string>(nameof(Gateway));
+    public decimal TaxRate => GetValue<decimal>(nameof(TaxRate));
+
+    public PaymentSettings(IJsonSerializer jsonSerializer, string? environment = null)
+        : base("settings.Payment.json", jsonSerializer, environment) { }
+}
+```
+Corresponding file `settings.Payment.json`:
+```json
+{
+  "Gateway": "stripe",
+  "TaxRate": 0.1
+}
+```
 
 #### Scope Context (`Kernel/Context/`)
 Standardized context for the current operation scope, providing authentication information.
@@ -153,7 +179,7 @@ Infrastructure for pluggable modules.
 - **`ModuleDescriptor`** — `record(Name, Assembly, MapEndpoints)` representing a registered module.
 - **`WebApplicationBuilderExtension`**:
   - `AddModules()` — Reads `InstanceSettings.ActiveModules`, reflects into loaded assemblies to find `IModule` implementations, calls `AddModule<T>()` for each active module.
-  - `AddModule<T>()` — Calls `T.Register()`, registers named OpenAPI document (`builder.Services.AddOpenApi(T.Name)`), scans event handlers, records in `ModuleRegistry`.
+  - `AddModule<T>()` — Auto-discovers `DynamicSettingsSection` subclasses in the module assembly and registers them. Falls back to `GenericModuleSettings` if no custom section exists. Calls `T.Register()`, registers named OpenAPI document (`builder.Services.AddOpenApi(T.Name)`), scans event handlers, records in `ModuleRegistry`.
   - `UseModules(WebApplication app)` — Post-build: iterates `ModuleRegistry`, calls `IEventTypeRegistry.RegisterFromAssembly()` per module, calls `module.MapEndpoints(app)`, maps `/openapi/{module.Name}.json`.
 
 > **Convention:** Each module project must have exactly one class implementing `IModule`. The class name doesn't matter; it's discovered by interface. The module assembly name must match the key in `ActiveModules`.
@@ -190,7 +216,7 @@ For distributing work across multiple API instances.
 - **`IPartitionManager`** — `GetRandomPartition()`.
 - **`PartitionManager`** — Depends on `InstanceSettings`. Returns a random `int` in `[Partition.Start, Partition.End]` using `Random.Shared`.
 
-> **Convention:** Use `IPartitionManager.GetRandomPartition()` when writing outbox messages to assign a partition. Each instance owns a range of partition numbers configured in `appsettings.Instance.json`.
+> **Convention:** Use `IPartitionManager.GetRandomPartition()` when writing outbox messages to assign a partition. Each instance owns a range of partition numbers configured in `settings.Instance.json`.
 
 #### API Settings (`Kernel/Configuration/`)
 Static (non-mutable) host-level configuration bound from `IConfiguration`.
@@ -244,29 +270,45 @@ A separate `Data` project to centralize EF database concerns. This would be a sh
 
 ## Configuration Architecture
 
+The system uses **two layers** of configuration:
+
+1. **ASP.NET `IConfiguration`** (`appsettings.json`) — static, host-level settings (logging, `Api`, `Database`). Bound via `IConfiguration.GetSection().Get<T>()`.
+2. **Dynamic Settings** (`settings.{Section}.json`) — runtime-mutable settings with environment overlays, auto-persist, and change events.
+
 ```
 Host/
-├── appsettings.json                    # Shared: AllowedHosts, Api.OpenApiViewer
-├── appsettings.{Environment}.json      # Environment overrides (logging, etc.)
-└── appsettings.Instance.json           # Per-instance: partition range, active modules
+├── appsettings.json                           # ASP.NET IConfiguration: AllowedHosts, Api, Database
+├── appsettings.{Environment}.json             # ASP.NET environment overrides (logging, etc.)
+├── settings.Application.json                  # DynamicSettings: Environment, PartitionAmount
+├── settings.Application.{Environment}.json    # Optional environment overlay
+├── settings.Instance.json                     # DynamicSettings: Partition, ActiveModules
+└── settings.Instance.{Environment}.json       # Optional environment overlay
 
 Modules/
 └── {ModuleName}/
-    └── appsettings.json                # Module-specific settings
+    ├── settings.{ModuleName}.json             # Module-specific dynamic settings
+    └── settings.{ModuleName}.{Environment}.json  # Optional environment overlay
 ```
 
-### appsettings.json (Api section)
+### appsettings.json (ASP.NET static config)
 ```json
 {
   "AllowedHosts": "*",
-  "Api": {
-    "OpenApiViewer": "scalar"
-  }
+  "Api": { "OpenApiViewer": "scalar" },
+  "Database": { "Provider": "Sqlite", "ConnectionString": "Data Source=kernel.db" }
 }
 ```
 Change `OpenApiViewer` to `"swagger"` to use Swagger UI instead of Scalar.
 
-### appsettings.Instance.json (expected shape)
+### settings.Application.json (ApplicationSettings)
+```json
+{
+  "Environment": "Development",
+  "PartitionAmount": 100
+}
+```
+
+### settings.Instance.json (InstanceSettings)
 ```json
 {
   "Partition": { "Start": 0, "End": 99 },
@@ -277,6 +319,9 @@ Change `OpenApiViewer` to `"swagger"` to use Swagger UI instead of Scalar.
 }
 ```
 
+### Environment Overlays
+For any section, create `settings.{Section}.{Environment}.json` in the same directory. Values in the environment file override the base file. Writes always go to the base file.
+
 ### OpenAPI Documents
 Each active component gets its own named OpenAPI document:
 - `kernel` → `/openapi/kernel.json` — registered by `AddKernel()`
@@ -284,8 +329,12 @@ Each active component gets its own named OpenAPI document:
 
 All documents are exposed in the viewer UI (Scalar or Swagger) mounted at `/scalar` or `/docs`.
 
-### Module appsettings.json
-Each module should own its own settings file. Module settings are loaded as a `DynamicSettingsSection` pointing at the module's `appsettings.json`.
+### Module Settings
+Each module should own its own `settings.{ModuleName}.json` file. Module settings are either:
+- Auto-loaded as a `GenericModuleSettings` section (fallback).
+- Loaded via a custom `DynamicSettingsSection` subclass in the module assembly (recommended — auto-discovered during `AddModule<T>()`).
+
+Module `.csproj` files include `<Content Include="settings.*.json" CopyToOutputDirectory="PreserveNewest" />` to ensure settings files are in the build output.
 
 ---
 
@@ -296,8 +345,9 @@ Scaffolds a new module under `Modules/{ModuleName}/`. The template is a **class 
 | File | Purpose |
 |---|---|
 | `{Name}Module.cs` | `IModule` implementation with `Name`, `Register()`, and `MapEndpoints()`. |
-| `{Name}.csproj` | `Microsoft.NET.Sdk` library; add `ProjectReference` to Kernel. |
-| `appsettings.json` | Module-specific settings placeholder. |
+| `{Name}.csproj` | `Microsoft.NET.Sdk` library; references Kernel. Includes `settings.*.json` as `Content` with `CopyToOutputDirectory`. |
+| `settings.{Name}.json` | Module-specific dynamic settings (base). |
+| `settings.{Name}.Development.json` | Module-specific development environment overlay. |
 
 **Module IModule implementation pattern:**
 ```csharp
@@ -320,7 +370,29 @@ public class MyModuleModule : IModule
 }
 ```
 
-> **To activate a module**: add its assembly to `ActiveModules` in `appsettings.Instance.json` and add a `ProjectReference` + `<Compile>` in the solution's `Directory.Build.props` or directly in `Host.csproj`.
+### Module Activation & Project References
+
+To wire up and activate a newly scaffolded module:
+
+1. **Reference the Module in the Host (`Host/Host.csproj`):**
+   ```xml
+   <ItemGroup>
+     <ProjectReference Include="..\Modules\MyModule\MyModule.csproj" />
+   </ItemGroup>
+   ```
+   Or via CLI:
+   ```bash
+   dotnet add Host/Host.csproj reference Modules/MyModule/MyModule.csproj
+   ```
+
+2. **Enable the Module in `Host/settings.Instance.json`:**
+   ```json
+   {
+     "ActiveModules": {
+       "MyModule": true
+     }
+   }
+   ```
 
 ---
 
@@ -407,14 +479,15 @@ Kernel → (no project references, only NuGet packages)
 | New kernel pipeline step | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`UseKernel`) |
 | New kernel extension method (feature-local) | Feature-local `WebApplicationBuilderExtensions.cs` |
 | New role constant | `Kernel/Context/Roles.cs` |
-| New static host-level setting | `Kernel/Configuration/ApiSettings.cs` (bound from `appsettings.json`) |
-| New runtime-mutable setting | New `DynamicSettingsSection` subclass pointing at the relevant JSON file |
+| New static host-level setting | `Kernel/Configuration/ApiSettings.cs` (bound from `appsettings.json` via `IConfiguration`) |
+| New runtime-mutable setting | New `DynamicSettingsSection` subclass with `SectionName` + `settings.{SectionName}.json` file |
 | New module | `Modules/{ModuleName}/` (use `modular-webapi-module` template) |
 | Module endpoints | `IModule.MapEndpoints(IEndpointRouteBuilder)` inside the module project |
 | Module-specific entities, handlers, services | Inside the module project |
 | Host pipeline configuration (viewers, middleware) | `Host/Program.cs` |
 | Global NuGet package settings | `Directory.Build.props` |
-| Host settings (logging, allowed hosts, Api section) | `Host/appsettings.json` |
-| Per-instance settings | `Host/appsettings.Instance.json` via `InstanceSettings` |
-| Module-specific settings | `Modules/{ModuleName}/appsettings.json` |
+| Host settings (logging, allowed hosts, Api section) | `Host/appsettings.json` (ASP.NET `IConfiguration`) |
+| Per-instance settings | `Host/settings.Instance.json` via `InstanceSettings` |
+| Application-level mutable settings | `Host/settings.Application.json` via `ApplicationSettings` |
+| Module-specific settings | `Modules/{ModuleName}/settings.{ModuleName}.json` |
 | Third-party licenses | `Kernel/ThirdParty/Licenses/` |

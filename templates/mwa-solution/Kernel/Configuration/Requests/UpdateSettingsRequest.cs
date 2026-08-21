@@ -26,7 +26,6 @@ public class UpdateSettingsRequestHandler : IRequestHandler<UpdateSettingsReques
             }
 
             section.SetValue(request.Key, request.Value);
-            _dynamicSettings.CommitChanges();
 
             return Task.FromResult(Result.Success(true));
         }

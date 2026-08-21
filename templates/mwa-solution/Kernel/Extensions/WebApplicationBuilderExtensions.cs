@@ -34,7 +34,9 @@ public static class WebApplicationBuilderExtensions
     ///   <item><see cref="IScopeContext"/> — scoped, backed by <see cref="WebScopeContext"/>.</item>
     ///   <item><see cref="IEventBus"/> — singleton, backed by <see cref="InProcessEventBus"/>.</item>
     ///   <item><see cref="IEventTypeRegistry"/> — singleton, backed by <see cref="EventTypeRegistry"/>.</item>
-    ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>appsettings.Instance.json</c>.</item>
+    ///   <item><see cref="DynamicSettings"/> — singleton, environment-aware.</item>
+    ///   <item><see cref="ApplicationSettings"/> — singleton, loaded from <c>settings.Application.json</c>.</item>
+    ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>settings.Instance.json</c>.</item>
     ///   <item><see cref="IPartitionManager"/> — singleton, backed by <see cref="PartitionManager"/>.</item>
     ///   <item><see cref="IMessageWriter"/> — scoped, backed by <see cref="MessageWriter"/>.</item>
     ///   <item><see cref="IMessageDispatcher"/> — scoped, backed by <see cref="MessageDispatcher"/>.</item>
@@ -58,25 +60,20 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(new ModuleRegistry());
 
         // ── Dynamic Settings ──────────────────────────────────────────────────
-        var dynamicSettings = new DynamicSettings(new JsonSerializer());
+        var environment = builder.Environment.EnvironmentName;
+        var jsonSerializer = new JsonSerializer();
+        var dynamicSettings = new DynamicSettings(jsonSerializer, environment);
+
+        // Register the core settings sections
+        var applicationSettings = new ApplicationSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(applicationSettings);
+
+        var instanceSettings = new InstanceSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(instanceSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
-
-        builder.Services.AddSingleton<AppSettings>(sp =>
-        {
-            var ds = sp.GetRequiredService<DynamicSettings>();
-            var json = sp.GetRequiredService<IJsonSerializer>();
-            // Only add if not already added (e.g. by another initialization step)
-            try { return ds.GetSection<AppSettings>(); }
-            catch { return ds.AddSection(new AppSettings("appsettings.json", json)); }
-        });
-
-        builder.Services.AddSingleton<InstanceSettings>(sp =>
-        {
-            var ds = sp.GetRequiredService<DynamicSettings>();
-            var json = sp.GetRequiredService<IJsonSerializer>();
-            try { return ds.GetSection<InstanceSettings>(); }
-            catch { return ds.AddSection(new InstanceSettings("appsettings.Instance.json", json)); }
-        });
+        builder.Services.AddSingleton(applicationSettings);
+        builder.Services.AddSingleton(instanceSettings);
 
         // ── Partition manager ─────────────────────────────────────────────────
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
@@ -116,7 +113,10 @@ public static class WebApplicationBuilderExtensions
 
     /// <summary>
     /// Configures the Kernel HTTP pipeline:
-    /// maps the kernel OpenAPI JSON document at <c>/openapi/kernel.json</c>.
+    /// maps the kernel OpenAPI JSON document at <c>/openapi/kernel.json</c>,
+    /// maps settings endpoints, and wires the <see cref="IEventBus"/> into
+    /// <see cref="DynamicSettings"/> so that <see cref="SettingsChangedEvent"/>
+    /// instances are published on value changes.
     /// </summary>
     /// <remarks>
     /// The OpenAPI viewer UI (Scalar or Swagger) is mounted in <c>Program.cs</c> of the Host,
@@ -125,6 +125,11 @@ public static class WebApplicationBuilderExtensions
     /// </remarks>
     public static void UseKernel(this WebApplication app)
     {
+        // Wire the event bus into DynamicSettings now that the container is built.
+        var dynamicSettings = app.Services.GetRequiredService<DynamicSettings>();
+        var eventBus = app.Services.GetRequiredService<IEventBus>();
+        dynamicSettings.SetEventBus(eventBus);
+
         // Expose the OpenAPI JSON documents globally. 
         // In .NET 9, a single call to MapOpenApi() registers the /openapi/{documentName}.json route
         // which dynamically resolves any document added via AddOpenApi(documentName).
