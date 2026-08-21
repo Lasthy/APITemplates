@@ -2,7 +2,6 @@ using Kernel.Common;
 using Kernel.Json;
 using Kernel.Partitioning;
 using Kernel.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace Kernel.Boxing;
 
@@ -12,7 +11,7 @@ namespace Kernel.Boxing;
 public class MessageWriter(
 	IJsonSerializer _jsonSerializer,
 	IPartitionManager _partitionManager,
-	KernelDbContext _db
+	IKernelDbContext _db
 ) : IMessageWriter
 {
 	/// <inheritdoc/>

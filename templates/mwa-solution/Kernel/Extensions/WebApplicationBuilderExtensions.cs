@@ -7,11 +7,8 @@ using Kernel.Json;
 using Kernel.Messaging;
 using Kernel.Modules;
 using Kernel.Partitioning;
-using Kernel.Persistence;
-using Kernel.Persistence.Extensions;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Extensions;
@@ -41,7 +38,6 @@ public static class WebApplicationBuilderExtensions
     ///   <item><see cref="IMessageWriter"/> — scoped, backed by <see cref="MessageWriter"/>.</item>
     ///   <item><see cref="IMessageDispatcher"/> — scoped, backed by <see cref="MessageDispatcher"/>.</item>
     ///   <item><see cref="IMessageProcessor"/> (Event channel) — scoped, backed by <see cref="EventMessageProcessor"/>.</item>
-    ///   <item><see cref="ApiSettings"/> — singleton bound from <c>appsettings.json#Api</c>.</item>
     ///   <item>OpenAPI document named <c>"kernel"</c>.</item>
     /// </list>
     /// </remarks>
@@ -83,29 +79,10 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IMessageDispatcher, MessageDispatcher>();
         builder.Services.AddScoped<IMessageProcessor, EventMessageProcessor>();
 
-        // ── Configuration ─────────────────────────────────────────────────────
-        var apiSettings = builder.Configuration
-            .GetSection(ApiSettings.SectionName)
-            .Get<ApiSettings>() ?? new ApiSettings();
-
-        builder.Services.AddSingleton(apiSettings);
-
         // ── Configuration Endpoints Requests ──────────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
         builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.GetSettingsRequest, string>, Kernel.Configuration.Requests.GetSettingsRequestHandler>();
         builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.UpdateSettingsRequest, bool>, Kernel.Configuration.Requests.UpdateSettingsRequestHandler>();
-
-        // ── Database / Persistence ────────────────────────────────────────────
-        var databaseOptions = builder.Configuration
-            .GetSection(DatabaseOptions.SectionName)
-            .Get<DatabaseOptions>() ?? new DatabaseOptions();
-        
-        builder.Services.AddSingleton(databaseOptions);
-        
-        builder.Services.AddDbContext<KernelDbContext>(options =>
-        {
-            options.UseConfiguredDatabase(databaseOptions.Provider, databaseOptions.ConnectionString);
-        });
 
         // ── OpenAPI — kernel document ─────────────────────────────────────────
         builder.Services.AddOpenApi("kernel");
@@ -118,11 +95,6 @@ public static class WebApplicationBuilderExtensions
     /// <see cref="DynamicSettings"/> so that <see cref="SettingsChangedEvent"/>
     /// instances are published on value changes.
     /// </summary>
-    /// <remarks>
-    /// The OpenAPI viewer UI (Scalar or Swagger) is mounted in <c>Program.cs</c> of the Host,
-    /// after <c>UseModules()</c>, so it has visibility of all module documents.
-    /// Read <c>ApiSettings.OpenApiViewer</c> to determine which viewer to mount.
-    /// </remarks>
     public static void UseKernel(this WebApplication app)
     {
         // Wire the event bus into DynamicSettings now that the container is built.
@@ -131,17 +103,10 @@ public static class WebApplicationBuilderExtensions
         dynamicSettings.SetEventBus(eventBus);
 
         // Expose the OpenAPI JSON documents globally. 
-        // In .NET 9, a single call to MapOpenApi() registers the /openapi/{documentName}.json route
+        // In .NET 9+, a single call to MapOpenApi() registers the /openapi/{documentName}.json route
         // which dynamically resolves any document added via AddOpenApi(documentName).
         app.MapOpenApi();
 
         app.MapSettingsEndpoints();
     }
-
-    /// <summary>
-    /// Returns the <see cref="ApiSettings"/> registered by <see cref="AddKernel"/>.
-    /// Use this in <c>Program.cs</c> to read <c>OpenApiViewer</c> and mount the correct UI.
-    /// </summary>
-    public static ApiSettings GetApiSettings(this WebApplication app) =>
-        app.Services.GetRequiredService<ApiSettings>();
 }

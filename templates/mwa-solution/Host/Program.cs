@@ -1,3 +1,4 @@
+using Data.Extensions;
 using Host.Extensions;
 using Kernel.Extensions;
 using Kernel.Modules;
@@ -6,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Register all cross-cutting Kernel services (JSON, context, events, messaging, OpenAPI).
 builder.AddKernel();
+
+// Register database options and persistence contexts from Data layer.
+builder.AddData();
 
 // Discover and register all active modules from settings.Instance.json.
 builder.AddModules();
@@ -18,7 +22,7 @@ app.UseKernel();
 // Map module endpoints, wire up per-module OpenAPI documents + event types.
 app.UseModules();
 
-// Mount OpenAPI viewer (Scalar or Swagger) configured in appsettings.json
+// Mount OpenAPI viewer (Scalar or Swagger) configured in settings.Instance.json
 app.UseOpenApiViewer();
 
 app.UseHttpsRedirection();

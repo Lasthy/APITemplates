@@ -1,4 +1,5 @@
 {
+  "OpenApiViewer": "scalar",
   "Partition": {
     "Start": 0,
     "End": 99

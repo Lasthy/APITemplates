@@ -16,7 +16,11 @@ The solution template scaffolds the **Host** (entry-point web app) and the **Ker
 ```
 Solution Root (MyAPI.slnx)
 ├── Host/                    # ASP.NET Web App — entry point, pipeline, appsettings
-│   └── Program.cs           # builder.AddKernel() + builder.AddModules()
+│   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
+├── Data/                    # Shared EF Core database infrastructure & contexts
+│   ├── Configuration/       # DataSettings (dynamic settings for Database: Provider, ConnectionString)
+│   ├── Extensions/          # WebApplicationBuilder extension (AddData)
+│   └── Persistence/         # KernelDbContext (implements IKernelDbContext)
 ├── Kernel/                  # Shared class library — all cross-cutting concerns
 │   ├── Common/              # Result pattern
 │   ├── Configuration/       # Dynamic settings system
@@ -29,12 +33,14 @@ Solution Root (MyAPI.slnx)
 │   ├── Messaging/           # Outbox/Inbox message persistence + processing
 │   ├── Modules/             # IModule contract + module registration infrastructure
 │   ├── Partitioning/        # Partition management for multi-instance deployments
-│   ├── Persistence/         # KernelDbContext + EF SaveChanges interceptors
+│   ├── Persistence/         # IDbContext, IKernelDbContext + EF SaveChanges interceptors
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces (stub)
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service
 │   └── ThirdParty/          # Third-party license files
 ├── Modules/                 # Directory where module projects live (.gitkeep placeholder)
+├── create-module.ps1        # Helper script to scaffold, sln-add, and Host-reference a new module (PowerShell)
+├── create-module.sh         # Helper script to scaffold, sln-add, and Host-reference a new module (Bash)
 ├── GlobalUsings.Shared.cs   # `global using DefaultId = System.Ulid;`
 └── Directory.Build.props    # Auto-includes GlobalUsings.Shared.cs in all projects
 ```
@@ -56,29 +62,41 @@ The executable ASP.NET web application. This is the composition root.
 
 | File | Purpose |
 |---|---|
-| `Program.cs` | Calls `builder.AddKernel()`, `builder.AddModules()`, `app.UseKernel()`, `app.UseModules()`, and mounts the OpenAPI viewer UI. |
-| `Host.csproj` | Web SDK project, references Kernel. Includes `Scalar.AspNetCore` and `Swashbuckle.AspNetCore`. |
-| `appsettings.json` | ASP.NET built-in configuration — logging, allowed hosts, `Api` section (OpenAPI viewer choice), `Database` section. |
+| `Program.cs` | Calls `builder.AddKernel()`, `builder.AddData()`, `builder.AddModules()`, `app.UseKernel()`, `app.UseModules()`, and mounts the OpenAPI viewer UI. |
+| `Host.csproj` | Web SDK project, references Kernel and Data. Includes `Scalar.AspNetCore` and `Swashbuckle.AspNetCore`. |
+| `appsettings.json` | ASP.NET built-in configuration — logging, allowed hosts. |
 | `appsettings.{Environment}.json` | ASP.NET environment-specific overrides (logging levels, etc.). |
 | `settings.Application.json` | Dynamic settings for the application: `Environment`, `PartitionAmount`. |
 | `settings.Application.{Environment}.json` | Optional environment overlay for application settings. |
-| `settings.Instance.json` | Per-instance dynamic settings: partition range, active modules dictionary. |
+| `settings.Data.json` | Dynamic settings for data/database: `Provider`, `ConnectionString`. |
+| `settings.Data.{Environment}.json` | Optional environment overlay for database settings. |
+| `settings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
 
 **Program.cs composition pattern:**
 ```csharp
 builder.AddKernel();      // Register kernel services + kernel OpenAPI doc
+builder.AddData();        // Register database options and DbContexts
 builder.AddModules();     // Discover + register active modules
 var app = builder.Build();
 app.UseKernel();          // Map /openapi/kernel.json
 app.UseModules();         // Map module endpoints + /openapi/{module}.json + event types
-// Mount Scalar or Swagger UI (reads Api.OpenApiViewer from appsettings.json)
+// Mount Scalar or Swagger UI (reads OpenApiViewer from settings.Instance.json)
 ```
 
 **Configuration strategy:**
-- The **main `appsettings.json`** is used by ASP.NET's built-in `IConfiguration` for static host-level settings: logging, allowed hosts, `Api.OpenApiViewer`, `Database`.
-- **`settings.Application.json`** (read by `ApplicationSettings`) contains runtime-mutable application settings with optional `settings.Application.{Environment}.json` overlays.
-- **`settings.Instance.json`** (read by `InstanceSettings`) contains per-instance config: partition range, active modules.
+- The **main `appsettings.json`** is used solely by ASP.NET's built-in `IConfiguration` for static host-level settings: logging, allowed hosts.
+- **`settings.Application.json`** (read by `ApplicationSettings`) contains runtime-mutable application settings.
+- **`settings.Data.json`** (read by `DataSettings`) contains runtime-mutable database provider and connection string settings.
+- **`settings.Instance.json`** (read by `InstanceSettings`) contains per-instance config: OpenAPI viewer choice (`OpenApiViewer`), partition range, active modules.
 - Each **module has its own `settings.{ModuleName}.json`** with optional `settings.{ModuleName}.{Environment}.json` overlays for module-specific configuration.
+
+### Data (`templates/mwa-solution/Data/`)
+
+A shared class library for Entity Framework Core persistence implementations, database provider registration, and shared DbContext infrastructure.
+
+- **`KernelDbContext`** — Concrete EF Core DbContext implementing `IKernelDbContext` (owns `DbSet<Message> Messages`).
+- **`DataSettings`** — Dynamic settings for database provider and connection string (`settings.Data.json`).
+- **`WebApplicationBuilderExtensions.AddData()`** — Registers `DataSettings`, wires up DbContext registration, and registers `IKernelDbContext` in DI.
 
 ### Kernel (`templates/mwa-solution/Kernel/`)
 
@@ -109,7 +127,7 @@ A runtime-mutable, convention-based settings system that reads from JSON files, 
 - **`DynamicSettings`** — Singleton registry of `DynamicSettingsSection` instances, keyed by `SectionName`. `AddSection<T>(instance)`, `GetSection<T>()`, `GetSection(name)`, `CommitChanges()`. When an `IEventBus` is wired (via `SetEventBus()` in `UseKernel()`), every value change automatically publishes a `SettingsChangedEvent`.
 - **`SettingsChangedEvent`** — `record(SectionName, Key) : Event`. Published via `IEventBus` whenever any section value changes. Subscribe with `IEventHandler<SettingsChangedEvent>` to react to configuration changes.
 - **`ApplicationSettings`** — `SectionName = "Application"`. Loaded from `settings.Application.json`. Exposes `Environment` and `PartitionAmount`.
-- **`InstanceSettings`** — `SectionName = "Instance"`. Loaded from `settings.Instance.json`. Exposes `Partition` (start/end range) and `ActiveModules` dictionary.
+- **`InstanceSettings`** — `SectionName = "Instance"`. Loaded from `settings.Instance.json`. Exposes `OpenApiViewer` (`"scalar"` | `"swagger"`), `Partition` (start/end range), and `ActiveModules` dictionary.
 - **`GenericModuleSettings`** — Internal fallback for modules that don't define a custom `DynamicSettingsSection` subclass. `SectionName` is set to the module name.
 
 > **Convention:** To add new settings, create a class inheriting from `DynamicSettingsSection`, declare `SectionName`, and expose properties using `GetValue<T>(nameof(Property))`. The system automatically loads the file `settings.{SectionName}.json` with optional `settings.{SectionName}.{Environment}.json` overlay. For modules, place custom `DynamicSettingsSection` subclasses in the module assembly — they are auto-discovered and registered during `AddModule<T>()`.
@@ -189,7 +207,7 @@ A channel-based message persistence and processing system (outbox pattern).
 
 - **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`.
 - **`MessageChannel`** — Enum: `Event`, `Email`.
-- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition, persists to `KernelDbContext.Messages`.
+- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition, persists to `IKernelDbContext.Messages`.
 - **`IMessageProcessor`** — Per-channel processor: `GetChannel()`, `ProcessMessage()`.
 - **`EventMessageProcessor`** — Processes `MessageChannel.Event` messages: resolves event type via `IEventTypeRegistry`, deserializes, publishes to `IEventBus` within a `TransactionScope`.
 - **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages to the correct `IMessageProcessor` by channel.
@@ -218,13 +236,6 @@ For distributing work across multiple API instances.
 
 > **Convention:** Use `IPartitionManager.GetRandomPartition()` when writing outbox messages to assign a partition. Each instance owns a range of partition numbers configured in `settings.Instance.json`.
 
-#### API Settings (`Kernel/Configuration/`)
-Static (non-mutable) host-level configuration bound from `IConfiguration`.
-
-- **`ApiSettings`** — POCO bound from the `Api` section of `appsettings.json`. Properties: `OpenApiViewer` (`"scalar"` | `"swagger"`, default `"scalar"`).
-
-> **Convention:** Add host-level static settings to `ApiSettings`. For runtime-mutable settings, use `DynamicSettingsSection` subclasses. `ApiSettings` is registered as a singleton by `AddKernel()`.
-
 #### Global Usings (`GlobalUsings.Shared.cs`)
 ```csharp
 global using DefaultId = System.Ulid;
@@ -238,10 +249,14 @@ Vendored Ulid implementation (from `Cysharp/Ulid`) with converters:
 - `UlidTypeConverter` — For general .NET type conversion.
 - `RandomProvider` — Cryptographic random provider for Ulid generation.
 
-#### EF Core Persistence (`Kernel/Persistence/`)
-- **`KernelDbContext`** — Owns `DbSet<Message> Messages`. This is the Kernel's own database context for infrastructure entities (messages/outbox).
+#### EF Core Persistence Abstractions (`Kernel/Persistence/`)
+- **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).
+- **`IKernelDbContext`** — Inherits `IDbContext`, exposes `DbSet<Message> Messages { get; }`.
 - **`AuditSaveChangesInterceptor`** — Stub class; should intercept `SaveChanges` to auto-populate `IAuditable` fields.
 - **`SoftDeleteSaveChangesInterceptor`** — Stub class; should intercept `SaveChanges` to convert deletes into soft-deletes for `ISoftDeletable` entities.
+
+#### EF Core Persistence Implementation (`Data/Persistence/`)
+- **`KernelDbContext`** — Implements `IKernelDbContext`, inherits `DbContext`. Registered in DI via `builder.AddData()`.
 
 ---
 
@@ -263,25 +278,24 @@ Both classes are empty stubs:
 
 > **Design intent:** Each module registers its own health checks. The health system groups and reports them by module.
 
-#### Data Project (Planned)
-A separate `Data` project to centralize EF database concerns. This would be a shared project that modules reference for common EF infrastructure (base DbContext utilities, common interceptors, migration helpers, etc.).
-
 ---
 
 ## Configuration Architecture
 
 The system uses **two layers** of configuration:
 
-1. **ASP.NET `IConfiguration`** (`appsettings.json`) — static, host-level settings (logging, `Api`, `Database`). Bound via `IConfiguration.GetSection().Get<T>()`.
+1. **ASP.NET `IConfiguration`** (`appsettings.json`) — static, host-level ASP.NET settings only (logging, allowed hosts). Bound via standard ASP.NET hosting.
 2. **Dynamic Settings** (`settings.{Section}.json`) — runtime-mutable settings with environment overlays, auto-persist, and change events.
 
 ```
 Host/
-├── appsettings.json                           # ASP.NET IConfiguration: AllowedHosts, Api, Database
+├── appsettings.json                           # ASP.NET IConfiguration: AllowedHosts, Logging
 ├── appsettings.{Environment}.json             # ASP.NET environment overrides (logging, etc.)
 ├── settings.Application.json                  # DynamicSettings: Environment, PartitionAmount
 ├── settings.Application.{Environment}.json    # Optional environment overlay
-├── settings.Instance.json                     # DynamicSettings: Partition, ActiveModules
+├── settings.Data.json                         # DynamicSettings: Provider, ConnectionString
+├── settings.Data.{Environment}.json            # Optional environment overlay
+├── settings.Instance.json                     # DynamicSettings: OpenApiViewer, Partition, ActiveModules
 └── settings.Instance.{Environment}.json       # Optional environment overlay
 
 Modules/
@@ -290,15 +304,12 @@ Modules/
     └── settings.{ModuleName}.{Environment}.json  # Optional environment overlay
 ```
 
-### appsettings.json (ASP.NET static config)
+### appsettings.json (ASP.NET static config only)
 ```json
 {
-  "AllowedHosts": "*",
-  "Api": { "OpenApiViewer": "scalar" },
-  "Database": { "Provider": "Sqlite", "ConnectionString": "Data Source=kernel.db" }
+  "AllowedHosts": "*"
 }
 ```
-Change `OpenApiViewer` to `"swagger"` to use Swagger UI instead of Scalar.
 
 ### settings.Application.json (ApplicationSettings)
 ```json
@@ -308,9 +319,18 @@ Change `OpenApiViewer` to `"swagger"` to use Swagger UI instead of Scalar.
 }
 ```
 
+### settings.Data.json (DataSettings)
+```json
+{
+  "Provider": "Sqlite",
+  "ConnectionString": "Data Source=kernel.db"
+}
+```
+
 ### settings.Instance.json (InstanceSettings)
 ```json
 {
+  "OpenApiViewer": "scalar",
   "Partition": { "Start": 0, "End": 99 },
   "ActiveModules": {
     "MyModule": true,
@@ -370,11 +390,38 @@ public class MyModuleModule : IModule
 }
 ```
 
-### Module Activation & Project References
+### Module Scaffolding & Activation
 
-To wire up and activate a newly scaffolded module:
+#### Creating a Module (Automated via Script)
+Run the helper script from the solution root:
+```powershell
+# PowerShell
+./create-module.ps1 Orders
+```
+or
+```bash
+# Bash
+./create-module.sh Orders
+```
+The script automatically:
+1. Executes `dotnet new mwa-module -n Orders`
+2. Adds the project to the `.slnx` solution under the `Modules` solution folder (`dotnet sln add Modules/Orders/Orders.csproj -s Modules`)
+3. Adds the project reference to `Host/Host.csproj` (`dotnet add Host/Host.csproj reference Modules/Orders/Orders.csproj`)
 
-1. **Reference the Module in the Host (`Host/Host.csproj`):**
+#### Manual Module Creation & Project References
+Alternatively, to perform these steps manually:
+
+1. **Scaffold the Module:**
+   ```bash
+   dotnet new mwa-module -n MyModule
+   ```
+
+2. **Add to Solution:**
+   ```bash
+   dotnet sln add Modules/MyModule/MyModule.csproj -s Modules
+   ```
+
+3. **Reference the Module in the Host (`Host/Host.csproj`):**
    ```xml
    <ItemGroup>
      <ProjectReference Include="..\Modules\MyModule\MyModule.csproj" />
@@ -385,7 +432,7 @@ To wire up and activate a newly scaffolded module:
    dotnet add Host/Host.csproj reference Modules/MyModule/MyModule.csproj
    ```
 
-2. **Enable the Module in `Host/settings.Instance.json`:**
+4. **Enable the Module in `Host/settings.Instance.json`:**
    ```json
    {
      "ActiveModules": {
@@ -455,8 +502,9 @@ Kernel/Host administrative operations that should only be accessible to system-l
 
 ### Project Dependencies
 ```
-Host → Kernel
-Module → Kernel (and optionally a future Data project)
+Host → Kernel, Data
+Data → Kernel
+Module → Kernel (and Data if using EF DbContexts)
 Kernel → (no project references, only NuGet packages)
 ```
 
@@ -479,15 +527,16 @@ Kernel → (no project references, only NuGet packages)
 | New kernel pipeline step | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`UseKernel`) |
 | New kernel extension method (feature-local) | Feature-local `WebApplicationBuilderExtensions.cs` |
 | New role constant | `Kernel/Context/Roles.cs` |
-| New static host-level setting | `Kernel/Configuration/ApiSettings.cs` (bound from `appsettings.json` via `IConfiguration`) |
+| New static host-level setting | `Host/appsettings.json` (ASP.NET static configuration, e.g. Logging, AllowedHosts) |
 | New runtime-mutable setting | New `DynamicSettingsSection` subclass with `SectionName` + `settings.{SectionName}.json` file |
 | New module | `Modules/{ModuleName}/` (use `modular-webapi-module` template) |
 | Module endpoints | `IModule.MapEndpoints(IEndpointRouteBuilder)` inside the module project |
 | Module-specific entities, handlers, services | Inside the module project |
 | Host pipeline configuration (viewers, middleware) | `Host/Program.cs` |
 | Global NuGet package settings | `Directory.Build.props` |
-| Host settings (logging, allowed hosts, Api section) | `Host/appsettings.json` (ASP.NET `IConfiguration`) |
+| Host settings (ASP.NET only: logging, allowed hosts) | `Host/appsettings.json` (ASP.NET `IConfiguration`) |
 | Per-instance settings | `Host/settings.Instance.json` via `InstanceSettings` |
 | Application-level mutable settings | `Host/settings.Application.json` via `ApplicationSettings` |
+| Database / Data dynamic settings | `Host/settings.Data.json` via `DataSettings` |
 | Module-specific settings | `Modules/{ModuleName}/settings.{ModuleName}.json` |
 | Third-party licenses | `Kernel/ThirdParty/Licenses/` |

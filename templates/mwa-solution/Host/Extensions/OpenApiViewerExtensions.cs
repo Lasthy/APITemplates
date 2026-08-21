@@ -1,4 +1,6 @@
+using Kernel.Configuration;
 using Kernel.Extensions;
+using Kernel.Modules;
 using Scalar.AspNetCore;
 
 namespace Host.Extensions;
@@ -8,14 +10,14 @@ public static class OpenApiViewerExtensions
     public static void UseOpenApiViewer(this WebApplication app)
     {
         // ── OpenAPI viewer UI ──────────────────────────────────────────────────────
-        // Reads Api.OpenApiViewer from appsettings.json: "scalar" (default) or "swagger".
+        // Reads OpenApiViewer from settings.Instance.json: "scalar" (default) or "swagger".
         // Only served in Development — remove the environment check to expose in other environments.
         if (app.Environment.IsDevelopment())
         {
-            var apiSettings = app.GetApiSettings();
-            var moduleRegistry = app.Services.GetService(typeof(Kernel.Modules.ModuleRegistry)) as Kernel.Modules.ModuleRegistry;
+            var instanceSettings = app.Services.GetRequiredService<InstanceSettings>();
+            var moduleRegistry = app.Services.GetService(typeof(ModuleRegistry)) as ModuleRegistry;
 
-            if (apiSettings.OpenApiViewer.Equals("swagger", StringComparison.OrdinalIgnoreCase))
+            if (instanceSettings.OpenApiViewer.Equals("swagger", StringComparison.OrdinalIgnoreCase))
             {
                 // Swagger UI — served at /docs
                 app.UseSwaggerUI(options =>

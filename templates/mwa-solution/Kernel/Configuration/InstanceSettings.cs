@@ -6,13 +6,24 @@ namespace Kernel.Configuration;
 /// Per-instance dynamic settings, loaded from <c>settings.Instance.json</c>
 /// with an optional environment overlay <c>settings.Instance.{Environment}.json</c>.
 /// <para>
-/// Contains partition range and active module toggles — values that vary per deployment instance.
+/// Contains OpenAPI viewer choice, partition range, and active module toggles — values that vary per deployment instance.
 /// </para>
 /// </summary>
 public class InstanceSettings : DynamicSettingsSection
 {
     /// <inheritdoc />
     public override string SectionName => "Instance";
+
+    /// <summary>
+    /// The OpenAPI UI viewer to mount.
+    /// Accepted values: <c>"scalar"</c> (default) or <c>"swagger"</c>.
+    /// </summary>
+    public string OpenApiViewer
+    {
+        get => TryGetValue<string>(nameof(OpenApiViewer), out var viewer) && !string.IsNullOrWhiteSpace(viewer)
+            ? viewer
+            : "scalar";
+    }
 
     /// <summary>
     /// The partition range owned by this instance for outbox message distribution.

@@ -1,0 +1,4 @@
+{
+  "Provider": "Sqlite",
+  "ConnectionString": "Data Source=kernel.db"
+}
