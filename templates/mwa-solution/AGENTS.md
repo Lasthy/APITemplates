@@ -136,6 +136,17 @@ Standardized context for the current operation scope, providing authentication a
   - Error handling with structured logging
   - Supports `RequestCancellation()` for graceful self-stop.
 
+### Request/Response & Interceptors (`Kernel/Requests/`)
+MediatR-style CQRS pattern with attribute-based interceptors:
+
+- **`IRequest<TResponse>`** — Marker interface for requests returning `Result<TResponse>`.
+- **`IRequestHandler<TRequest, TResponse>`** — Handler interface: `HandleAsync(request, ct)`.
+- **`IDispatcher` / `Dispatcher`** — Dispatches requests through interceptor pipelines to their handlers.
+- **`[Logging]`** — Interceptor attribute for logging payload, execution duration, and outcome.
+- **`[Transaction]`** — Interceptor attribute wrapping execution in a `TransactionScope`.
+- **`[Intercept<T>]` / `[Intercept(typeof(T))]`** — Attaches custom `IRequestInterceptor` implementations.
+- **`Order`** — Control pipeline execution order (lower numbers run outermost, e.g. `[Logging(Order = 1)]`, `[Transaction(Order = 2)]`).
+
 ### Module System (`Kernel/Modules/`)
 Pluggable module architecture:
 
@@ -143,7 +154,7 @@ Pluggable module architecture:
   - `static abstract string Name` — module identifier; must match the key in `ActiveModules`.
   - `static abstract void Register(IServiceCollection, IConfiguration)` — DI registration.
   - `static abstract void MapEndpoints(IEndpointRouteBuilder)` — route registration.
-- **`AddModules()`** / **`UseModules()`** — Discovers active modules from `settings.Instance.json`, registers dynamic settings, scans event handlers, registers OpenAPI docs, and maps endpoints.
+- **`AddModules()`** / **`UseModules()`** — Discovers active modules from `settings.Instance.json`, registers dynamic settings, scans and registers event handlers (`IEventHandler<>`) and request handlers (`IRequestHandler<,>`), registers OpenAPI docs, and maps endpoints.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

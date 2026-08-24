@@ -1,6 +1,7 @@
 using Kernel.Configuration;
 using Kernel.Events;
 using Kernel.Json;
+using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -129,6 +130,9 @@ public static class WebApplicationBuilderExtension
         // Register all IEventHandler<> implementations from the module's assembly.
         RegisterEventHandlers(builder.Services, typeof(T).Assembly);
 
+        // Register all IRequestHandler<,> implementations from the module's assembly.
+        RegisterRequestHandlers(builder.Services, typeof(T).Assembly);
+
         // Record in the ModuleRegistry for post-build MapEndpoints and event type wiring.
         var registry = builder.Services
             .Where(d => d.ServiceType == typeof(ModuleRegistry))
@@ -226,4 +230,28 @@ public static class WebApplicationBuilderExtension
         }
     }
 
+    private static void RegisterRequestHandlers(IServiceCollection services, Assembly assembly)
+    {
+        var handlerInterface = typeof(IRequestHandler<,>);
+        var implementations = assembly.GetTypes()
+            .Where(t =>
+                !t.IsAbstract &&
+                !t.IsInterface &&
+                t.GetInterfaces().Any(i =>
+                    i.IsGenericType &&
+                    i.GetGenericTypeDefinition() == handlerInterface))
+            .ToList();
+
+        foreach (var implementation in implementations)
+        {
+            var interfaces = implementation.GetInterfaces()
+                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == handlerInterface)
+                .ToList();
+
+            foreach (var @interface in interfaces)
+            {
+                services.AddScoped(@interface, implementation);
+            }
+        }
+    }
 }

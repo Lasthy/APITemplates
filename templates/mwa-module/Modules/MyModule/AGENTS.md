@@ -89,18 +89,33 @@ To enable this module, ensure `"MyModule": true` is set in `Host/settings.Instan
 
 Organize business logic into vertical slices inside the `Features/` directory:
 
-- **Requests / Commands / Queries**: Name them directly as verbs/actions (e.g., `CreateItem`, `GetItems`, `UpdateItemStatus`). **Do not** append `Request` to the class/record name.
-- **Handlers**: Name them with the `Handler` suffix (e.g., `CreateItemHandler`, `GetItemsHandler`).
-- **Result pattern**: All handlers must return `Result` or `Result<T>`. Never throw expected exceptions.
+- **Requests / Commands / Queries**: Implement `IRequest<TResponse>`. Name them directly as verbs/actions (e.g., `CreateItem`, `GetItems`, `UpdateItemStatus`). **Do not** append `Request` to the class/record name.
+- **Handlers**: Implement `IRequestHandler<TRequest, TResponse>`. Name them with the `Handler` suffix (e.g., `CreateItemHandler`, `GetItemsHandler`). Handlers are automatically discovered and registered by `AddModules()`.
+- **Result pattern**: All handlers must return `Result<TResponse>`. Never throw expected exceptions.
+- **Interceptors**: Decorate handler classes with attributes such as `[Logging]`, `[Transaction]`, or `[Intercept<TCustom>]` with optional `Order = n`.
 
 **Example Feature:**
 ```csharp
 // Features/CreateItem.cs
-public record CreateItem(string Name, decimal Price);
+using Kernel.Requests;
+
+public record CreateItem(string Name, decimal Price) : IRequest<DefaultId>;
 
 // Features/CreateItemHandler.cs
-public class CreateItemHandler(ILogger<CreateItemHandler> logger)
+using Kernel.Common;
+using Kernel.Requests;
+
+[Logging(Order = 1)]
+[Transaction(Order = 2)]
+public class CreateItemHandler : IRequestHandler<CreateItem, DefaultId>
 {
+    private readonly ILogger<CreateItemHandler> _logger;
+
+    public CreateItemHandler(ILogger<CreateItemHandler> logger)
+    {
+        _logger = logger;
+    }
+
     public async Task<Result<DefaultId>> HandleAsync(CreateItem command, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.Name))

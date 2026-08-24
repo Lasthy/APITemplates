@@ -6,6 +6,7 @@ namespace Kernel.Configuration.Features;
 
 public record UpdateSettings(string SectionName, string Key, JsonElement Value) : IRequest<bool>;
 
+[Logging]
 public class UpdateSettingsHandler : IRequestHandler<UpdateSettings, bool>
 {
     private readonly DynamicSettings _dynamicSettings;

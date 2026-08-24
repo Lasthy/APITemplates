@@ -85,6 +85,8 @@ public static class WebApplicationBuilderExtensions
 
         // ── Configuration Features ───────────────────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
+        builder.Services.AddTransient<LoggingInterceptor>();
+        builder.Services.AddTransient<TransactionInterceptor>();
         builder.Services.AddScoped<IRequestHandler<GetSettings, string>, GetSettingsHandler>();
         builder.Services.AddScoped<IRequestHandler<UpdateSettings, bool>, UpdateSettingsHandler>();
 

@@ -256,6 +256,20 @@ Vendored Ulid implementation (from `Cysharp/Ulid`) with converters:
 - `UlidTypeConverter` — For general .NET type conversion.
 - `RandomProvider` — Cryptographic random provider for Ulid generation.
 
+#### Request/Response Pattern (`Kernel/Requests/`)
+A MediatR-style CQRS pattern with an attribute-based interceptor pipeline.
+
+- **`IRequest<TResponse>`** — Marker interface for requests returning `Result<TResponse>`.
+- **`IRequestHandler<TRequest, TResponse>`** — Handler interface: `HandleAsync(request, ct)`.
+- **`IDispatcher` / `Dispatcher`** — Resolves the appropriate `IRequestHandler<,>`, inspects `[RequestInterceptor]` attributes on the handler, builds an ordered interceptor pipeline, and executes it. Auto-unwraps exceptions into `Result.Failure<TResponse>`.
+- **`IRequestInterceptor`** — Contract: `InterceptAsync(request, next, ct)`.
+- **`RequestInterceptorAttribute`** — Base attribute for applying interceptors to handlers. Exposes `Order` (`int`, default `0`, lower numbers execute outermost).
+- **`InterceptAttribute<TInterceptor>` / `InterceptAttribute`** — Generic and type-based attributes for attaching arbitrary interceptors.
+- **`LoggingAttribute` & `LoggingInterceptor`** — Logs incoming request payload, measures execution duration with `Stopwatch`, and logs outcome. Configurable `LogLevel` and `IncludePayload`.
+- **`TransactionAttribute` & `TransactionInterceptor`** — Wraps handler execution in a `TransactionScope` (`TransactionScopeAsyncFlowOption.Enabled`). Commits on `Result.IsSuccess`, rolls back on `Result.IsFailure` or exceptions. Configurable `IsolationLevel`, `TimeoutSeconds`, and `ScopeOption`.
+
+> **Convention:** Place feature requests and handlers in `Features/` vertical slices. Decorate handler classes with `[Logging]`, `[Transaction]`, or `[Intercept<T>]` with optional `Order = n` and custom parameters. Module request handlers are auto-discovered during `AddModule<T>()`.
+
 #### EF Core Persistence Abstractions (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).
 - **`IKernelDbContext`** — Inherits `IDbContext`, exposes `DbSet<Message> Messages { get; }`.
@@ -268,15 +282,6 @@ Vendored Ulid implementation (from `Cysharp/Ulid`) with converters:
 ---
 
 ### 🔲 Stub / Not Yet Implemented
-
-#### Request/Response Pattern (`Kernel/Requests/`)
-All interfaces and the dispatcher are empty stubs:
-- `IRequest` — Should define a request that returns `Result<TResponse>`.
-- `IRequestHandler` — Should handle a request and produce a response.
-- `IRequestInterceptor` — Should wrap handler execution (logging, validation, auth, etc.).
-- `IDispatcher` / `Dispatcher` — Should resolve and invoke the correct handler with the interceptor pipeline.
-
-> **Design intent:** This is a MediatR-like pattern. A request goes through interceptors → handler → result. Interceptors form a pipeline (think: validation interceptor, logging interceptor, transaction interceptor).
 
 #### Health Checks (`Kernel/Health/`)
 Both classes are empty stubs:

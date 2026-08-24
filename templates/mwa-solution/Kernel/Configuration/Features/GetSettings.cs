@@ -5,6 +5,7 @@ namespace Kernel.Configuration.Features;
 
 public record GetSettings(string SectionName) : IRequest<string>;
 
+[Logging]
 public class GetSettingsHandler : IRequestHandler<GetSettings, string>
 {
     private readonly DynamicSettings _dynamicSettings;
