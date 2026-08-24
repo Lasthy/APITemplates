@@ -231,9 +231,9 @@ Centralized JSON serializer with consistent configuration.
 > **Convention:** Always use `IJsonSerializer` for JSON operations — never use `System.Text.Json.JsonSerializer` directly. This ensures consistent Ulid handling and future converter additions.
 
 #### Background Workers (`Kernel/Workers/`)
-- **`BaseWorker`** — Abstract `BackgroundService` with a configurable `Interval` (default 1 min). Creates a DI scope per iteration, calls `ExecuteJobAsync()`, handles errors with structured logging. Supports `RequestCancellation()` for graceful self-stop.
+- **`BaseWorker`** — Abstract `BackgroundService` with a configurable `Interval` (default 1 min) or one-shot execution mode (`isOneShot: true`). Creates a DI scope per iteration (or once if one-shot), calls `ExecuteJobAsync()`, handles errors with structured logging. Supports `RequestCancellation()` for graceful self-stop.
 
-> **Convention:** Module workers inherit from `BaseWorker`. Override `ExecuteJobAsync(IServiceProvider, CancellationToken)`. Resolve scoped services from the provided `IServiceProvider`.
+> **Convention:** Module workers inherit from `BaseWorker`. Override `ExecuteJobAsync(IServiceProvider, CancellationToken)`. Resolve scoped services from the provided `IServiceProvider`. For startup or data migration tasks that should run once, pass `isOneShot: true` to the base constructor.
 
 #### Partitioning (`Kernel/Partitioning/`)
 For distributing work across multiple API instances.

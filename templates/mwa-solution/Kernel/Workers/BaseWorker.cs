@@ -11,13 +11,20 @@ namespace Kernel.Workers;
 public abstract class BaseWorker(
     IServiceScopeFactory scopeFactory,
     ILogger logger,
-    TimeSpan? interval = null) : BackgroundService
+    TimeSpan? interval = null,
+    bool isOneShot = false) : BackgroundService
 {
     protected TimeSpan Interval { get; set; } = interval ?? TimeSpan.FromMinutes(1);
+    protected bool IsOneShot { get; set; } = isOneShot;
     private bool _cancellationRequested = false;
 
     protected BaseWorker(IServiceScopeFactory scopeFactory, ILogger logger)
-        : this(scopeFactory, logger, null)
+        : this(scopeFactory, logger, null, false)
+    {
+    }
+
+    protected BaseWorker(IServiceScopeFactory scopeFactory, ILogger logger, bool isOneShot)
+        : this(scopeFactory, logger, null, isOneShot)
     {
     }
 
@@ -36,6 +43,11 @@ public abstract class BaseWorker(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Error in worker {WorkerName}.", workerName);
+            }
+
+            if (IsOneShot)
+            {
+                break;
             }
 
             await Task.Delay(Interval, stoppingToken);
