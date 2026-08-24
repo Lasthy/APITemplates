@@ -19,7 +19,7 @@ internal sealed class GenericModuleSettings : DynamicSettingsSection
     public override string SectionName => _sectionName;
 
     public GenericModuleSettings(string sectionName, string source, IJsonSerializer jsonSerializer, string? environment = null)
-        : base(source, jsonSerializer, environment)
+        : base(source, jsonSerializer, environment, sectionName)
     {
         _sectionName = sectionName;
     }

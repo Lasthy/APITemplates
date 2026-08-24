@@ -1,4 +1,5 @@
 using Kernel.Json;
+using System.Collections;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -10,17 +11,20 @@ namespace Kernel.Configuration;
 /// using <see cref="GetValue{T}"/> / <see cref="SetValue"/>.
 /// <para>
 /// Files follow the naming convention:
-/// <c>settings.{SectionName}.json</c> (base) and
-/// <c>settings.{SectionName}.{Environment}.json</c> (optional environment overlay).
-/// Environment values overlay base values — base values are always persisted on write.
+/// <c>appsettings.{SectionName}.json</c> (base) or <c>appsettings.json</c> for root host settings, and
+/// <c>appsettings.{SectionName}.{Environment}.json</c> (or <c>appsettings.{Environment}.json</c>) for environment overlays.
+/// Environment values and environment variables overlay base values — base values are always persisted on write.
 /// </para>
 /// </summary>
 public abstract class DynamicSettingsSection
 {
+	private readonly string? _explicitSectionName;
+
 	/// <summary>
 	/// The section name, used as the key in <see cref="DynamicSettings"/> and in the file name convention.
+	/// An empty string indicates root/host settings (<c>appsettings.json</c>).
 	/// </summary>
-	public abstract string SectionName { get; }
+	public virtual string SectionName => _explicitSectionName ?? string.Empty;
 
 	/// <summary>
 	/// When <c>true</c>, <see cref="SetValue"/> calls are silently ignored.
@@ -47,40 +51,74 @@ public abstract class DynamicSettingsSection
 	public string? EnvironmentSource { get; private set; }
 
 	/// <summary>
+	/// The environment name (e.g. <c>"Development"</c>).
+	/// </summary>
+	[JsonIgnore]
+	public string? EnvironmentName { get; private set; }
+
+	/// <summary>
 	/// Raised whenever a setting value is changed via <see cref="SetValue"/>.
 	/// Parameters: the section instance and the key that changed.
 	/// </summary>
 	public event Action<DynamicSettingsSection, string>? OnSettingsChanged;
 
-	private Dictionary<string, JsonElement> _baseOptions = [];
-	private Dictionary<string, JsonElement> _envOptions = [];
-	private Dictionary<string, JsonElement> _merged = [];
+	private Dictionary<string, JsonElement> _baseOptions = new(StringComparer.OrdinalIgnoreCase);
+	private Dictionary<string, JsonElement> _envOptions = new(StringComparer.OrdinalIgnoreCase);
+	private Dictionary<string, JsonElement> _envVarOptions = new(StringComparer.OrdinalIgnoreCase);
+	private Dictionary<string, JsonElement> _merged = new(StringComparer.OrdinalIgnoreCase);
 
 	[JsonIgnore]
 	protected readonly IJsonSerializer JsonSerializer;
 
 	/// <summary>
-	/// Constructs the section by loading the base file and an optional environment overlay.
+	/// Returns the merged key-value dictionary (base + environment overlay + environment variables).
 	/// </summary>
-	/// <param name="source">Path to the base settings file (<c>settings.{SectionName}.json</c>).</param>
+	[JsonIgnore]
+	public IReadOnlyDictionary<string, JsonElement> MergedValues => _merged;
+
+	/// <summary>
+	/// Constructs the section by loading the base file, optional environment overlay, and environment variables.
+	/// </summary>
+	/// <param name="source">Path to the base settings file.</param>
 	/// <param name="jsonSerializer">The centralized JSON serializer.</param>
 	/// <param name="environment">
 	/// Optional environment name (e.g. <c>"Development"</c>).
-	/// When provided, an overlay file <c>settings.{SectionName}.{environment}.json</c>
-	/// in the same directory is merged on top of the base values.
+	/// When provided, an overlay file in the same directory is merged on top of base values.
 	/// </param>
-	protected DynamicSettingsSection(string source, IJsonSerializer jsonSerializer, string? environment = null)
+	/// <param name="sectionName">Optional explicit section name for dynamic or root sections.</param>
+	protected DynamicSettingsSection(
+		string source,
+		IJsonSerializer jsonSerializer,
+		string? environment = null,
+		string? sectionName = null)
 	{
 		Source = source;
 		JsonSerializer = jsonSerializer;
+		EnvironmentName = environment;
+		_explicitSectionName = sectionName;
 
-		_baseOptions = LoadFile(source);
+		Initialize();
+	}
 
-		// Load environment overlay if it exists
-		if (!string.IsNullOrEmpty(environment))
+	/// <summary>
+	/// Re-initializes and reloads base options, environment overlays, and environment variables.
+	/// </summary>
+	public void Initialize()
+	{
+		_baseOptions = LoadFile(Source);
+		_envOptions = [];
+		_envVarOptions = [];
+
+		var effectiveSection = SectionName;
+
+		// 1. Load environment JSON overlay if specified
+		if (!string.IsNullOrEmpty(EnvironmentName))
 		{
-			var dir = Path.GetDirectoryName(source);
-			var envFileName = $"settings.{SectionName}.{environment}.json";
+			var dir = Path.GetDirectoryName(Source);
+			var envFileName = string.IsNullOrEmpty(effectiveSection)
+				? $"appsettings.{EnvironmentName}.json"
+				: $"appsettings.{effectiveSection}.{EnvironmentName}.json";
+
 			var envFilePath = string.IsNullOrEmpty(dir) ? envFileName : Path.Combine(dir, envFileName);
 
 			if (File.Exists(envFilePath))
@@ -90,14 +128,26 @@ public abstract class DynamicSettingsSection
 			}
 		}
 
+		// 2. Load environment variables
+		LoadEnvironmentVariables(effectiveSection);
+
+		// 3. Merge: Base -> Environment JSON -> Environment Variables
 		RebuildMerged();
 	}
 
 	/// <summary>
-	/// Gets a strongly-typed value by key from the merged (base + env) settings.
+	/// Gets a strongly-typed value by key from the merged (base + env + env-vars) settings.
 	/// </summary>
 	/// <exception cref="KeyNotFoundException">When the key does not exist.</exception>
-	public T GetValue<T>(string key) => _merged[key].Deserialize<T>()!;
+	public T GetValue<T>(string key)
+	{
+		if (_merged.TryGetValue(key, out var element))
+		{
+			return element.Deserialize<T>()!;
+		}
+
+		throw new KeyNotFoundException($"Key '{key}' was not found in settings section '{SectionName}'.");
+	}
 
 	/// <summary>
 	/// Tries to get a strongly-typed value by key. Returns <c>false</c> if the key is missing.
@@ -154,23 +204,72 @@ public abstract class DynamicSettingsSection
 	private Dictionary<string, JsonElement> LoadFile(string path)
 	{
 		if (!File.Exists(path))
-			return [];
+			return new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
 
 		var content = File.ReadAllText(path);
 		if (string.IsNullOrWhiteSpace(content))
-			return [];
+			return new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
 
-		return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content);
+		var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content);
+		return new Dictionary<string, JsonElement>(dict ?? [], StringComparer.OrdinalIgnoreCase);
+	}
+
+	private void LoadEnvironmentVariables(string effectiveSection)
+	{
+		var envVars = System.Environment.GetEnvironmentVariables();
+		var sectionPrefix = string.IsNullOrEmpty(effectiveSection) ? string.Empty : $"{effectiveSection}__";
+		var appsettingsPrefix = string.IsNullOrEmpty(effectiveSection) ? "APPSETTINGS__" : $"APPSETTINGS__{effectiveSection}__";
+		var settingsPrefix = string.IsNullOrEmpty(effectiveSection) ? "SETTINGS__" : $"SETTINGS__{effectiveSection}__";
+
+		foreach (DictionaryEntry entry in envVars)
+		{
+			if (entry.Key is not string key || entry.Value is not string strValue)
+				continue;
+
+			string? settingKey = null;
+
+			if (key.StartsWith(appsettingsPrefix, StringComparison.OrdinalIgnoreCase))
+			{
+				settingKey = key[appsettingsPrefix.Length..];
+			}
+			else if (key.StartsWith(settingsPrefix, StringComparison.OrdinalIgnoreCase))
+			{
+				settingKey = key[settingsPrefix.Length..];
+			}
+			else if (!string.IsNullOrEmpty(sectionPrefix) && key.StartsWith(sectionPrefix, StringComparison.OrdinalIgnoreCase))
+			{
+				settingKey = key[sectionPrefix.Length..];
+			}
+
+			if (string.IsNullOrWhiteSpace(settingKey))
+				continue;
+
+			// Handle nested keys e.g. "Partition__Start" => "Partition:Start" or nested json
+			try
+			{
+				using var doc = JsonDocument.Parse(strValue);
+				_envVarOptions[settingKey] = doc.RootElement.Clone();
+			}
+			catch
+			{
+				_envVarOptions[settingKey] = JsonSerializer.SerializeToElement(strValue);
+			}
+		}
 	}
 
 	/// <summary>
-	/// Merges base + environment options. Environment values win on conflict.
+	/// Merges base + environment file options + environment variables. Precedence: EnvVars > EnvFile > Base.
 	/// </summary>
 	private void RebuildMerged()
 	{
-		_merged = new Dictionary<string, JsonElement>(_baseOptions);
+		_merged = new Dictionary<string, JsonElement>(_baseOptions, StringComparer.OrdinalIgnoreCase);
 
 		foreach (var (key, value) in _envOptions)
+		{
+			_merged[key] = value;
+		}
+
+		foreach (var (key, value) in _envVarOptions)
 		{
 			_merged[key] = value;
 		}

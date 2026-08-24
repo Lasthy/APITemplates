@@ -17,7 +17,7 @@
 
   <!-- Include settings files in the build output so the Host can load them at runtime. -->
   <ItemGroup>
-    <Content Include="settings.*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="appsettings.*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

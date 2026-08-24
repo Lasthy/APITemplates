@@ -23,7 +23,7 @@ public class DataSettings : DynamicSettingsSection
     public string ConnectionString => GetValue<string>(nameof(ConnectionString));
 
     public DataSettings(IJsonSerializer jsonSerializer, string? environment = null)
-        : base("settings.Data.json", jsonSerializer, environment)
+        : base("appsettings.Data.json", jsonSerializer, environment)
     {
     }
 }

@@ -12,14 +12,14 @@ namespace MyModule;
 /// <remarks>
 /// This class is discovered automatically by the Kernel's <c>AddModules()</c> extension method.
 /// To activate this module, set <c>"MyModule": true</c> in <c>ActiveModules</c>
-/// inside <c>settings.Instance.json</c>.
+/// inside <c>appsettings.Instance.json</c>.
 /// Any class implementing <see cref="Kernel.Health.IHealthCheck"/> within this assembly is
 /// automatically discovered and registered under this module's health checks.
 /// </remarks>
 public class MyModuleModule : IModule
 {
     /// <summary>
-    /// The module name — must match the key in <c>ActiveModules</c> in <c>settings.Instance.json</c>.
+    /// The module name — must match the key in <c>ActiveModules</c> in <c>appsettings.Instance.json</c>.
     /// </summary>
     public static string Name => "MyModule";
 

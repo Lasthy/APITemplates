@@ -66,7 +66,7 @@ public class MessagingSettings : DynamicSettingsSection
         TryGetValue<bool>(nameof(DeleteFailedMessagesOnCleanup), out var val) && val;
 
     public MessagingSettings(IJsonSerializer jsonSerializer, string? environment = null)
-        : base("settings.Messaging.json", jsonSerializer, environment)
+        : base("appsettings.Messaging.json", jsonSerializer, environment)
     {
     }
 }

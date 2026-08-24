@@ -16,7 +16,7 @@ public static class WebApplicationBuilderExtensions
 {
     /// <summary>
     /// Registers the <see cref="DataSettings"/> dynamic section and the <see cref="KernelDbContext"/>
-    /// (bound to <see cref="IKernelDbContext"/>) configured with the database provider specified in <c>settings.Data.json</c>.
+    /// (bound to <see cref="IKernelDbContext"/>) configured with the database provider specified in <c>appsettings.Data.json</c>.
     /// </summary>
     public static void AddData(this WebApplicationBuilder builder)
     {

@@ -57,7 +57,7 @@ try {
     }
 
     Write-Host "Module '$Name' created and configured successfully!" -ForegroundColor Green
-    Write-Host "Remember to enable '$Name' in Host/settings.Instance.json if required." -ForegroundColor Yellow
+    Write-Host "Remember to enable '$Name' in Host/appsettings.Instance.json if required." -ForegroundColor Yellow
 }
 finally {
     Pop-Location

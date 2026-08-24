@@ -18,21 +18,26 @@ public class UpdateSettingsHandler : IRequestHandler<UpdateSettings, bool>
 
     public Task<Result<bool>> HandleAsync(UpdateSettings request, CancellationToken cancellationToken = default)
     {
-        try
+        var sectionName = request.SectionName;
+        if (!_dynamicSettings.TryGetSection(sectionName, out var section))
         {
-            var section = _dynamicSettings.GetSection(request.SectionName);
-            if (section.IsReadonly)
+            if (string.Equals(sectionName, "Host", StringComparison.OrdinalIgnoreCase) &&
+                _dynamicSettings.TryGetSection(string.Empty, out var hostSection))
             {
-                return Task.FromResult(Result.Failure<bool>(new InvalidOperationException($"Settings section '{request.SectionName}' is read-only.")));
+                section = hostSection;
             }
-
-            section.SetValue(request.Key, request.Value);
-
-            return Task.FromResult(Result.Success(true));
+            else
+            {
+                return Task.FromResult(Result.Failure<bool>(new KeyNotFoundException($"Settings section '{request.SectionName}' not found.")));
+            }
         }
-        catch (KeyNotFoundException)
+
+        if (section.IsReadonly)
         {
-            return Task.FromResult(Result.Failure<bool>(new KeyNotFoundException($"Settings section '{request.SectionName}' not found.")));
+            return Task.FromResult(Result.Failure<bool>(new InvalidOperationException($"Settings section '{request.SectionName}' is read-only.")));
         }
+
+        section.SetValue(request.Key, request.Value);
+        return Task.FromResult(Result.Success(true));
     }
 }

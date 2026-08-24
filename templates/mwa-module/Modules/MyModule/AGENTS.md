@@ -23,8 +23,8 @@ Modules/MyModule/
 │   └── MyModuleSettings.cs                # Inherits DynamicSettingsSection
 ├── Persistence/                           # Module EF Core DbContext & configurations
 ├── MyModuleModule.cs                      # IModule entry point (Register, Policies, MapEndpoints)
-├── settings.MyModule.json                 # Module dynamic settings (base)
-├── settings.MyModule.Development.json     # Module dynamic settings (Dev overlay)
+├── appsettings.MyModule.json                 # Module dynamic settings (base)
+├── appsettings.MyModule.Development.json     # Module dynamic settings (Dev overlay)
 ├── MyModule.csproj                        # Project references Kernel (and Data if using EF)
 └── AGENTS.md                              # This module guide
 ```
@@ -66,7 +66,7 @@ public class MyModuleModule : IModule
 ```
 
 ### Module Activation
-To enable this module, ensure `"MyModule": true` is set in `Host/settings.Instance.json` under `ActiveModules`:
+To enable this module, ensure `"MyModule": true` is set in `Host/appsettings.Instance.json` under `ActiveModules`:
 ```json
 {
   "ActiveModules": {
@@ -132,7 +132,7 @@ public class CreateItemHandler : IRequestHandler<CreateItem, DefaultId>
 
 ## 4. Dynamic Configuration
 
-Modules have their own `settings.MyModule.json` and optional `settings.MyModule.Development.json` overlays.
+Modules have their own `appsettings.MyModule.json` and optional `appsettings.MyModule.Development.json` overlays.
 
 ### Creating Strongly-Typed Module Settings
 Inherit from `DynamicSettingsSection` — it will be auto-discovered and registered during module startup:
@@ -146,7 +146,7 @@ public class MyModuleSettings : DynamicSettingsSection
     public string ApiKey => GetValue<string>(nameof(ApiKey));
 
     public MyModuleSettings(IJsonSerializer jsonSerializer, string? environment = null)
-        : base("settings.MyModule.json", jsonSerializer, environment) { }
+        : base("appsettings.MyModule.json", jsonSerializer, environment) { }
 }
 ```
 

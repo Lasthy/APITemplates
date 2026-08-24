@@ -17,14 +17,20 @@ public class GetSettingsHandler : IRequestHandler<GetSettings, string>
 
     public Task<Result<string>> HandleAsync(GetSettings request, CancellationToken cancellationToken = default)
     {
-        try
+        var sectionName = request.SectionName;
+        if (!_dynamicSettings.TryGetSection(sectionName, out var section))
         {
-            var section = _dynamicSettings.GetSection(request.SectionName);
-            return Task.FromResult(Result.Success<string>(section.GetAsJson()));
+            if (string.Equals(sectionName, "Host", StringComparison.OrdinalIgnoreCase) &&
+                _dynamicSettings.TryGetSection(string.Empty, out var hostSection))
+            {
+                section = hostSection;
+            }
+            else
+            {
+                return Task.FromResult(Result.Failure<string>(new KeyNotFoundException($"Settings section '{request.SectionName}' not found.")));
+            }
         }
-        catch (KeyNotFoundException)
-        {
-            return Task.FromResult(Result.Failure<string>(new KeyNotFoundException($"Settings section '{request.SectionName}' not found.")));
-        }
+
+        return Task.FromResult(Result.Success<string>(section.GetAsJson()));
     }
 }

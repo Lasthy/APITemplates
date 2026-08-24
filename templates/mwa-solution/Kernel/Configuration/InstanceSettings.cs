@@ -4,8 +4,8 @@ using Kernel.Partitioning;
 namespace Kernel.Configuration;
 
 /// <summary>
-/// Per-instance dynamic settings, loaded from <c>settings.Instance.json</c>
-/// with an optional environment overlay <c>settings.Instance.{Environment}.json</c>.
+/// Per-instance dynamic settings, loaded from <c>appsettings.Instance.json</c>
+/// with an optional environment overlay <c>appsettings.Instance.{Environment}.json</c>.
 /// <para>
 /// Contains OpenAPI viewer choice, partition range, and active module toggles — values that vary per deployment instance.
 /// </para>
@@ -44,7 +44,7 @@ public class InstanceSettings : DynamicSettingsSection
     }
 
     public InstanceSettings(IJsonSerializer jsonSerializer, string? environment = null)
-        : base("settings.Instance.json", jsonSerializer, environment)
+        : base("appsettings.Instance.json", jsonSerializer, environment)
     {
     }
 }

@@ -11,7 +11,7 @@ builder.AddKernel();
 // Register database options and persistence contexts from Data layer.
 builder.AddData();
 
-// Discover and register all active modules from settings.Instance.json.
+// Discover and register all active modules from appsettings.Instance.json.
 builder.AddModules();
 
 var app = builder.Build();
@@ -22,7 +22,7 @@ app.UseKernel();
 // Map module endpoints, wire up per-module OpenAPI documents + event types.
 app.UseModules();
 
-// Mount OpenAPI viewer (Scalar or Swagger) configured in settings.Instance.json
+// Mount OpenAPI viewer (Scalar or Swagger) configured in appsettings.Instance.json
 app.UseOpenApiViewer();
 
 app.UseHttpsRedirection();

@@ -5,7 +5,7 @@ namespace Kernel.Partitioning;
 /// <summary>
 /// Default implementation of <see cref="IPartitionManager"/>.
 /// Generates a random partition number within the total partition space,
-/// as configured in <c>settings.Application.json</c> → <c>ApplicationSettings.PartitionAmount</c>.
+/// as configured in <c>appsettings.Application.json</c> → <c>ApplicationSettings.PartitionAmount</c>.
 /// </summary>
 public class PartitionManager : IPartitionManager
 {
@@ -30,7 +30,7 @@ public class PartitionManager : IPartitionManager
         {
             throw new InvalidOperationException(
                 $"Invalid PartitionAmount configured: {amount}. PartitionAmount must be greater than 0. " +
-                $"Check ApplicationSettings in settings.Application.json.");
+                $"Check ApplicationSettings in appsettings.Application.json.");
         }
 
         // Random.Shared is thread-safe in .NET 6+.

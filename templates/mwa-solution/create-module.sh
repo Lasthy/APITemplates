@@ -45,4 +45,4 @@ echo "Creating module '$MODULE_NAME'..."
 )
 
 echo "Module '$MODULE_NAME' created and configured successfully!"
-echo "Remember to enable '$MODULE_NAME' in Host/settings.Instance.json if required."
+echo "Remember to enable '$MODULE_NAME' in Host/appsettings.Instance.json if required."

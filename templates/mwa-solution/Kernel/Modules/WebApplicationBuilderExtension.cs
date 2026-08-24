@@ -17,7 +17,7 @@ namespace Kernel.Modules;
 public static class WebApplicationBuilderExtension
 {
     /// <summary>
-    /// Discovers and registers all active modules from <c>settings.Instance.json</c>.
+    /// Discovers and registers all active modules from <c>appsettings.Instance.json</c>.
     /// For each active module it calls <see cref="AddModule{T}"/>, which registers module
     /// services, per-module OpenAPI document, and event handlers.
     /// </summary>
@@ -84,7 +84,7 @@ public static class WebApplicationBuilderExtension
     /// <summary>
     /// Registers a single module of type <typeparamref name="T"/>:
     /// <list type="bullet">
-    ///   <item>Loads module settings from <c>settings.{ModuleName}.json</c>.</item>
+    ///   <item>Loads module settings from <c>appsettings.{ModuleName}.json</c>.</item>
     ///   <item>Auto-discovers <see cref="DynamicSettingsSection"/> subclasses in the module assembly.</item>
     ///   <item>Calls <see cref="IModule.Register"/> to register module services.</item>
     ///   <item>Registers a named OpenAPI document for the module.</item>
@@ -109,7 +109,7 @@ public static class WebApplicationBuilderExtension
             RegisterModuleSettingsSections(dynamicSettings, typeof(T).Assembly, jsonSerializer, environment);
 
             // Fall back: if no custom section was found, create a generic one for the module
-            var settingsPath = $"settings.{T.Name}.json";
+            var settingsPath = $"appsettings.{T.Name}.json";
             if (!dynamicSettings.GetSectionNames().Any(n =>
                     string.Equals(n, T.Name, StringComparison.OrdinalIgnoreCase)) &&
                 File.Exists(settingsPath))

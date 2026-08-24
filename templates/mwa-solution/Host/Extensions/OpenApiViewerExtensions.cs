@@ -10,7 +10,7 @@ public static class OpenApiViewerExtensions
     public static void UseOpenApiViewer(this WebApplication app)
     {
         // ── OpenAPI viewer UI ──────────────────────────────────────────────────────
-        // Reads OpenApiViewer from settings.Instance.json: "scalar" (default) or "swagger".
+        // Reads OpenApiViewer from appsettings.Instance.json: "scalar" (default) or "swagger".
         // Only served in Development — remove the environment check to expose in other environments.
         if (app.Environment.IsDevelopment())
         {

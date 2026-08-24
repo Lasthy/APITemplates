@@ -3,8 +3,8 @@ using Kernel.Json;
 namespace Kernel.Configuration;
 
 /// <summary>
-/// Application-level dynamic settings, loaded from <c>settings.Application.json</c>
-/// with an optional environment overlay <c>settings.Application.{Environment}.json</c>.
+/// Application-level dynamic settings, loaded from <c>appsettings.Application.json</c>
+/// with an optional environment overlay <c>appsettings.Application.{Environment}.json</c>.
 /// <para>
 /// This is the primary settings section for the application (replaces the former <c>AppSettings</c>).
 /// </para>
@@ -25,7 +25,7 @@ public class ApplicationSettings : DynamicSettingsSection
     public int PartitionAmount => GetValue<int>(nameof(PartitionAmount));
 
     public ApplicationSettings(IJsonSerializer jsonSerializer, string? environment = null)
-        : base("settings.Application.json", jsonSerializer, environment)
+        : base("appsettings.Application.json", jsonSerializer, environment)
     {
     }
 }

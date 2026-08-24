@@ -1,5 +1,6 @@
 using Kernel.Events;
 using Kernel.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Kernel.Configuration;
 
@@ -13,15 +14,28 @@ namespace Kernel.Configuration;
 /// </summary>
 public class DynamicSettings
 {
-	private readonly Dictionary<string, DynamicSettingsSection> _settings = [];
+	private readonly Dictionary<string, DynamicSettingsSection> _settings = new(StringComparer.OrdinalIgnoreCase);
 	private readonly IJsonSerializer _jsonSerializer;
 	private readonly string? _environment;
 	private IEventBus? _eventBus;
 
+	/// <summary>
+	/// Raised whenever a new section is registered.
+	/// </summary>
+	public event Action<DynamicSettingsSection>? OnSectionAdded;
+
+	/// <summary>
+	/// Raised whenever any setting value changes in any registered section.
+	/// </summary>
+	public event Action<DynamicSettingsSection, string>? OnSettingChanged;
+
 	public DynamicSettings(IJsonSerializer jsonSerializer, string? environment = null)
 	{
 		_jsonSerializer = jsonSerializer;
-		_environment = environment;
+		_environment = environment ?? 
+			System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? 
+			System.Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? 
+			"Production";
 	}
 
 	/// <summary>
@@ -30,10 +44,21 @@ public class DynamicSettings
 	public IEnumerable<string> GetSectionNames() => _settings.Keys;
 
 	/// <summary>
+	/// Returns all registered sections.
+	/// </summary>
+	public IEnumerable<DynamicSettingsSection> GetSections() => _settings.Values;
+
+	/// <summary>
 	/// Gets a section by its <see cref="DynamicSettingsSection.SectionName"/>.
 	/// </summary>
 	/// <exception cref="KeyNotFoundException">When the section is not registered.</exception>
 	public DynamicSettingsSection GetSection(string name) => _settings[name];
+
+	/// <summary>
+	/// Tries to get a section by its <see cref="DynamicSettingsSection.SectionName"/>.
+	/// </summary>
+	public bool TryGetSection(string name, [NotNullWhen(true)] out DynamicSettingsSection? section) =>
+		_settings.TryGetValue(name, out section);
 
 	/// <summary>
 	/// Gets a strongly-typed section. Looks up by the instance's <see cref="DynamicSettingsSection.SectionName"/>.
@@ -60,6 +85,7 @@ public class DynamicSettings
 	{
 		_settings[instance.SectionName] = instance;
 		WireChangeEvent(instance);
+		OnSectionAdded?.Invoke(instance);
 		return instance;
 	}
 
@@ -96,6 +122,8 @@ public class DynamicSettings
 	{
 		section.OnSettingsChanged += (changedSection, key) =>
 		{
+			OnSettingChanged?.Invoke(changedSection, key);
+
 			if (_eventBus is not null)
 			{
 				// Fire-and-forget publish. Handlers run synchronously in-process.

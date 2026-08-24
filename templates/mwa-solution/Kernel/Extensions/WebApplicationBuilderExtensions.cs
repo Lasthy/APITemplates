@@ -17,6 +17,7 @@ using Kernel.Persistence;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Extensions;
@@ -42,9 +43,10 @@ public static class WebApplicationBuilderExtensions
     ///   <item><see cref="IHealthCheckRegistry"/> — singleton, backed by <see cref="HealthCheckRegistry"/>.</item>
     ///   <item><see cref="IHealthService"/> — scoped, backed by <see cref="HealthService"/>.</item>
     ///   <item><see cref="DynamicSettings"/> — singleton, environment-aware.</item>
-    ///   <item><see cref="ApplicationSettings"/> — singleton, loaded from <c>settings.Application.json</c>.</item>
-    ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>settings.Instance.json</c>.</item>
-    ///   <item><see cref="MessagingSettings"/> — singleton, loaded from <c>settings.Messaging.json</c>.</item>
+    ///   <item><see cref="HostSettings"/> — singleton, loaded from <c>appsettings.json</c>.</item>
+    ///   <item><see cref="ApplicationSettings"/> — singleton, loaded from <c>appsettings.Application.json</c>.</item>
+    ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>appsettings.Instance.json</c>.</item>
+    ///   <item><see cref="MessagingSettings"/> — singleton, loaded from <c>appsettings.Messaging.json</c>.</item>
     ///   <item><see cref="IPartitionManager"/> — singleton, backed by <see cref="PartitionManager"/>.</item>
     ///   <item><see cref="IMessageWriter"/> — scoped, backed by <see cref="MessageWriter"/>.</item>
     ///   <item><see cref="IMessageDispatcher"/> — scoped, backed by <see cref="MessageDispatcher"/>.</item>
@@ -80,6 +82,13 @@ public static class WebApplicationBuilderExtensions
         var jsonSerializer = new JsonSerializer();
         var dynamicSettings = new DynamicSettings(jsonSerializer, environment);
 
+        // Register DynamicSettings into ASP.NET Configuration pipeline
+        ((IConfigurationBuilder)builder.Configuration).AddDynamicSettings(dynamicSettings);
+
+        // Register root host settings (settings.json, settings.{Environment}.json)
+        var hostSettings = new HostSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(hostSettings);
+
         // Register the core settings sections
         var applicationSettings = new ApplicationSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(applicationSettings);
@@ -91,6 +100,7 @@ public static class WebApplicationBuilderExtensions
         dynamicSettings.AddSection(messagingSettings);
 
         builder.Services.AddSingleton(dynamicSettings);
+        builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
         builder.Services.AddSingleton(instanceSettings);
         builder.Services.AddSingleton(messagingSettings);
