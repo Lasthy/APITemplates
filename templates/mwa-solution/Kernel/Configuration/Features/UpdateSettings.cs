@@ -2,20 +2,20 @@ using Kernel.Common;
 using Kernel.Requests;
 using System.Text.Json;
 
-namespace Kernel.Configuration.Requests;
+namespace Kernel.Configuration.Features;
 
-public record UpdateSettingsRequest(string SectionName, string Key, JsonElement Value) : IRequest<bool>;
+public record UpdateSettings(string SectionName, string Key, JsonElement Value) : IRequest<bool>;
 
-public class UpdateSettingsRequestHandler : IRequestHandler<UpdateSettingsRequest, bool>
+public class UpdateSettingsHandler : IRequestHandler<UpdateSettings, bool>
 {
     private readonly DynamicSettings _dynamicSettings;
 
-    public UpdateSettingsRequestHandler(DynamicSettings dynamicSettings)
+    public UpdateSettingsHandler(DynamicSettings dynamicSettings)
     {
         _dynamicSettings = dynamicSettings;
     }
 
-    public Task<Result<bool>> HandleAsync(UpdateSettingsRequest request, CancellationToken cancellationToken = default)
+    public Task<Result<bool>> HandleAsync(UpdateSettings request, CancellationToken cancellationToken = default)
     {
         try
         {

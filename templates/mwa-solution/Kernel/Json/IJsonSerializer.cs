@@ -14,6 +14,10 @@ public interface IJsonSerializer
 	/// <returns>A string that represents the object in json format.</returns>
 	/// <exception cref="JsonSerializationException"></exception>
 	string Serialize(object obj);
+	
+	/// <summary>
+	/// Serializes an object to a JsonElement.
+	/// </summary>
 	JsonElement SerializeToElement(object obj);
 	
 	/// <summary>

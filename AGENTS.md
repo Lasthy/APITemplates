@@ -23,7 +23,7 @@ Solution Root (MyAPI.slnx)
 │   └── Persistence/         # KernelDbContext (implements IKernelDbContext)
 ├── Kernel/                  # Shared class library — all cross-cutting concerns
 │   ├── Common/              # Result pattern
-│   ├── Configuration/       # Dynamic settings system
+│   ├── Configuration/       # Dynamic settings system (Controllers/, Features/)
 │   ├── Context/             # Scoped operation context (auth, claims)
 │   ├── Entities/            # Entity marker interfaces (audit, soft-delete, domain events)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
@@ -129,6 +129,8 @@ A runtime-mutable, convention-based settings system that reads from JSON files, 
 - **`ApplicationSettings`** — `SectionName = "Application"`. Loaded from `settings.Application.json`. Exposes `Environment` and `PartitionAmount`.
 - **`InstanceSettings`** — `SectionName = "Instance"`. Loaded from `settings.Instance.json`. Exposes `OpenApiViewer` (`"scalar"` | `"swagger"`), `Partition` (start/end range), and `ActiveModules` dictionary.
 - **`GenericModuleSettings`** — Internal fallback for modules that don't define a custom `DynamicSettingsSection` subclass. `SectionName` is set to the module name.
+- **`SettingsController`** (`Kernel/Configuration/Controllers/SettingsController.cs`) — ASP.NET Core controller exposing endpoints under route `api/v1/kernel/settings`. Protected by `[Authorize(Roles = Roles.System)]` and tagged in the `kernel` OpenAPI group.
+- **Features** (`Kernel/Configuration/Features/`) — CQRS/Vertical slice requests and handlers: `GetSettings` / `GetSettingsHandler`, `UpdateSettings` / `UpdateSettingsHandler`.
 
 > **Convention:** To add new settings, create a class inheriting from `DynamicSettingsSection`, declare `SectionName`, and expose properties using `GetValue<T>(nameof(Property))`. The system automatically loads the file `settings.{SectionName}.json` with optional `settings.{SectionName}.{Environment}.json` overlay. For modules, place custom `DynamicSettingsSection` subclasses in the module assembly — they are auto-discovered and registered during `AddModule<T>()`.
 
@@ -493,6 +495,8 @@ Kernel/Host administrative operations that should only be accessible to system-l
 ### Naming
 - **Identifiers** are always `DefaultId` (= `Ulid`). Never use `Guid`, `int`, or `string` for entity IDs.
 - **Namespaces** follow the folder structure.
+- **Features & Requests**: Place requests/commands/queries in a `Features/` folder. Do **not** append `Request` to the record/class name; name them directly as verbs/actions (e.g., `GetSettings`, `UpdateSettings`, `CreateOrder`). The handler is named with a `Handler` suffix (e.g. `GetSettingsHandler`, `UpdateSettingsHandler`, `CreateOrderHandler`).
+- **Endpoints & Routing**: All API endpoints must start with `api/<version>/` (e.g., `api/v1/kernel/settings`, `api/v1/orders`). Controllers use `[Route("api/v1/...")]`.
 - **Extension methods** for `WebApplicationBuilder` go in files named `WebApplicationBuilderExtensions.cs` within their feature folder.
 
 ### Patterns
@@ -519,6 +523,8 @@ Kernel → (no project references, only NuGet packages)
 | What you're adding | Where it goes |
 |---|---|
 | New cross-cutting infrastructure (e.g., caching, rate limiting) | `Kernel/{FeatureName}/` |
+| New feature request & handler | `Kernel/{FeatureName}/Features/` or `Modules/{ModuleName}/Features/` |
+| New API controller | `Kernel/{FeatureName}/Controllers/` or `Modules/{ModuleName}/Controllers/` |
 | New entity marker interface | `Kernel/Entities/` |
 | New EF interceptor | `Kernel/Persistence/` |
 | New message channel + processor | `Kernel/Messaging/` (namespace: `Kernel.Boxing`) |

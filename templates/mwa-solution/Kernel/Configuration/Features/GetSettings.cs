@@ -1,20 +1,20 @@
 using Kernel.Common;
 using Kernel.Requests;
 
-namespace Kernel.Configuration.Requests;
+namespace Kernel.Configuration.Features;
 
-public record GetSettingsRequest(string SectionName) : IRequest<string>;
+public record GetSettings(string SectionName) : IRequest<string>;
 
-public class GetSettingsRequestHandler : IRequestHandler<GetSettingsRequest, string>
+public class GetSettingsHandler : IRequestHandler<GetSettings, string>
 {
     private readonly DynamicSettings _dynamicSettings;
 
-    public GetSettingsRequestHandler(DynamicSettings dynamicSettings)
+    public GetSettingsHandler(DynamicSettings dynamicSettings)
     {
         _dynamicSettings = dynamicSettings;
     }
 
-    public Task<Result<string>> HandleAsync(GetSettingsRequest request, CancellationToken cancellationToken = default)
+    public Task<Result<string>> HandleAsync(GetSettings request, CancellationToken cancellationToken = default)
     {
         try
         {

@@ -1,6 +1,7 @@
 using Kernel.Boxing;
 using Kernel.Configuration;
-using Kernel.Configuration.Endpoints;
+using Kernel.Configuration.Controllers;
+using Kernel.Configuration.Features;
 using Kernel.Context;
 using Kernel.Events;
 using Kernel.Json;
@@ -79,10 +80,13 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IMessageDispatcher, MessageDispatcher>();
         builder.Services.AddScoped<IMessageProcessor, EventMessageProcessor>();
 
-        // ── Configuration Endpoints Requests ──────────────────────────────────
+        // ── Controllers ───────────────────────────────────────────────────────
+        builder.Services.AddControllers().AddApplicationPart(typeof(SettingsController).Assembly);
+
+        // ── Configuration Features ───────────────────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
-        builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.GetSettingsRequest, string>, Kernel.Configuration.Requests.GetSettingsRequestHandler>();
-        builder.Services.AddScoped<IRequestHandler<Kernel.Configuration.Requests.UpdateSettingsRequest, bool>, Kernel.Configuration.Requests.UpdateSettingsRequestHandler>();
+        builder.Services.AddScoped<IRequestHandler<GetSettings, string>, GetSettingsHandler>();
+        builder.Services.AddScoped<IRequestHandler<UpdateSettings, bool>, UpdateSettingsHandler>();
 
         // ── OpenAPI — kernel document ─────────────────────────────────────────
         builder.Services.AddOpenApi("kernel");
@@ -91,7 +95,7 @@ public static class WebApplicationBuilderExtensions
     /// <summary>
     /// Configures the Kernel HTTP pipeline:
     /// maps the kernel OpenAPI JSON document at <c>/openapi/kernel.json</c>,
-    /// maps settings endpoints, and wires the <see cref="IEventBus"/> into
+    /// maps controllers, and wires the <see cref="IEventBus"/> into
     /// <see cref="DynamicSettings"/> so that <see cref="SettingsChangedEvent"/>
     /// instances are published on value changes.
     /// </summary>
@@ -107,6 +111,6 @@ public static class WebApplicationBuilderExtensions
         // which dynamically resolves any document added via AddOpenApi(documentName).
         app.MapOpenApi();
 
-        app.MapSettingsEndpoints();
+        app.MapControllers();
     }
 }

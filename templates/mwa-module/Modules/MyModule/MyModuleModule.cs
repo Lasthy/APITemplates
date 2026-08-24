@@ -50,7 +50,7 @@ public class MyModuleModule : IModule
     {
         // TODO: Map module endpoints here.
         // Example:
-        //   var group = app.MapGroup("/mymodule").WithTags("MyModule").WithGroupName(Name);
+        //   var group = app.MapGroup("/api/v1/mymodule").WithTags("MyModule").WithGroupName(Name);
         //   group.MapGet("/", () => Results.Ok("Hello from MyModule!"));
     }
 }
