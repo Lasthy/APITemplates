@@ -38,9 +38,10 @@ public static class WebApplicationBuilderExtensions
 
         builder.Services.AddSingleton(dataSettings);
 
-        builder.Services.AddDbContext<KernelDbContext>(options =>
+        builder.Services.AddDbContext<KernelDbContext>((sp, options) =>
         {
             options.UseConfiguredDatabase(dataSettings.Provider, dataSettings.ConnectionString);
+            options.AddKernelInterceptors(sp);
         });
 
         builder.Services.AddScoped<IKernelDbContext>(sp => sp.GetRequiredService<KernelDbContext>());

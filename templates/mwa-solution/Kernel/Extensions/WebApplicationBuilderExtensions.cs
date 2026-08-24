@@ -8,8 +8,10 @@ using Kernel.Json;
 using Kernel.Messaging;
 using Kernel.Modules;
 using Kernel.Partitioning;
+using Kernel.Persistence;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Extensions;
@@ -89,6 +91,14 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddTransient<TransactionInterceptor>();
         builder.Services.AddScoped<IRequestHandler<GetSettings, string>, GetSettingsHandler>();
         builder.Services.AddScoped<IRequestHandler<UpdateSettings, bool>, UpdateSettingsHandler>();
+
+        // ── Persistence Interceptors ──────────────────────────────────────────
+        builder.Services.AddScoped<ISaveChangesInterceptor, SoftDeleteSaveChangesInterceptor>();
+        builder.Services.AddScoped<ISaveChangesInterceptor, AuditSaveChangesInterceptor>();
+        builder.Services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsSaveChangesInterceptor>();
+        builder.Services.AddScoped<SoftDeleteSaveChangesInterceptor>();
+        builder.Services.AddScoped<AuditSaveChangesInterceptor>();
+        builder.Services.AddScoped<DispatchDomainEventsSaveChangesInterceptor>();
 
         // ── OpenAPI — kernel document ─────────────────────────────────────────
         builder.Services.AddOpenApi("kernel");

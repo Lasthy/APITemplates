@@ -273,8 +273,10 @@ A MediatR-style CQRS pattern with an attribute-based interceptor pipeline.
 #### EF Core Persistence Abstractions (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).
 - **`IKernelDbContext`** — Inherits `IDbContext`, exposes `DbSet<Message> Messages { get; }`.
-- **`AuditSaveChangesInterceptor`** — Stub class; should intercept `SaveChanges` to auto-populate `IAuditable` fields.
-- **`SoftDeleteSaveChangesInterceptor`** — Stub class; should intercept `SaveChanges` to convert deletes into soft-deletes for `ISoftDeletable` entities.
+- **`AuditSaveChangesInterceptor`** — Intercepts `SaveChanges` / `SaveChangesAsync` to auto-populate `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy` on `IAuditable` entities using `IScopeContext`.
+- **`SoftDeleteSaveChangesInterceptor`** — Intercepts `SaveChanges` / `SaveChangesAsync` to convert `EntityState.Deleted` into `EntityState.Modified` and populate `DeletedAt`, `DeletedBy` on `ISoftDeletable` entities using `IScopeContext`.
+- **`DispatchDomainEventsSaveChangesInterceptor`** — Intercepts `SavedChanges` / `SavedChangesAsync` to collect and dispatch `DomainEvents` from `IHasDomainEvents` entities via `IEventBus` and clear them.
+- **`DbContextOptionsBuilderExtensions`** — Helper extension methods (`UseConfiguredDatabase`, `AddKernelInterceptors`) for configuring providers and attaching interceptors.
 
 #### EF Core Persistence Implementation (`Data/Persistence/`)
 - **`KernelDbContext`** — Implements `IKernelDbContext`, inherits `DbContext`. Registered in DI via `builder.AddData()`.

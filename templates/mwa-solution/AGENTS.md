@@ -147,6 +147,15 @@ MediatR-style CQRS pattern with attribute-based interceptors:
 - **`[Intercept<T>]` / `[Intercept(typeof(T))]`** — Attaches custom `IRequestInterceptor` implementations.
 - **`Order`** — Control pipeline execution order (lower numbers run outermost, e.g. `[Logging(Order = 1)]`, `[Transaction(Order = 2)]`).
 
+### Persistence & EF Core Interceptors (`Kernel/Persistence/`)
+Shared database infrastructure and automated cross-cutting concerns:
+
+- **`IDbContext`** / **`IKernelDbContext`** — Database context contracts for EF Core operations and outbox messages.
+- **`AuditSaveChangesInterceptor`** — Automatically sets `CreatedAt`/`CreatedBy` on entity addition and `UpdatedAt`/`UpdatedBy` on entity modification using `IScopeContext`.
+- **`SoftDeleteSaveChangesInterceptor`** — Converts hard deletes on `ISoftDeletable` entities into soft deletes (`EntityState.Modified`), updating `DeletedAt` and `DeletedBy`.
+- **`DispatchDomainEventsSaveChangesInterceptor`** — Automatically collects and dispatches `DomainEvents` from `IHasDomainEvents` entities through `IEventBus` upon saving and clears them.
+- **`DbContextOptionsBuilderExtensions`** — Helper extension methods (`UseConfiguredDatabase`, `AddKernelInterceptors`) for configuring providers and attaching interceptors.
+
 ### Module System (`Kernel/Modules/`)
 Pluggable module architecture:
 

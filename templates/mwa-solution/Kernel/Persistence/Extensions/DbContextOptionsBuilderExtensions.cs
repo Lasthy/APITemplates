@@ -1,10 +1,27 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Persistence.Extensions;
 
 public static class DbContextOptionsBuilderExtensions
 {
+    /// <summary>
+    /// Adds all registered <see cref="ISaveChangesInterceptor"/> instances from the service provider
+    /// to the DbContext options.
+    /// </summary>
+    /// <param name="builder">The options builder.</param>
+    /// <param name="serviceProvider">The service provider used to resolve registered interceptors.</param>
+    /// <returns>The options builder so that further configuration can be chained.</returns>
+    public static DbContextOptionsBuilder AddKernelInterceptors(
+        this DbContextOptionsBuilder builder,
+        IServiceProvider serviceProvider)
+    {
+        var interceptors = serviceProvider.GetServices<ISaveChangesInterceptor>();
+        return builder.AddInterceptors(interceptors);
+    }
+
     /// <summary>
     /// Configures the DbContext to use the specified database provider using reflection.
     /// The consuming project must have the appropriate Entity Framework Core provider NuGet package installed.
