@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Kernel.Constants;
 using Microsoft.AspNetCore.Http;
 
 namespace Kernel.Context;
@@ -81,5 +82,5 @@ public class WebScopeContext : IScopeContext
         _user?.IsInRole(role) ?? false;
 
     /// <inheritdoc/>
-    public bool IsSystem => IsInRole(Context.Roles.System);
+    public bool IsSystem => IsInRole(Constants.Roles.System);
 }

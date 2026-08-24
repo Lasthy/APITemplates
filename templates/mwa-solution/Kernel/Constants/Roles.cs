@@ -1,4 +1,4 @@
-namespace Kernel.Context;
+namespace Kernel.Constants;
 
 /// <summary>
 /// Well-known role constants used for authorization across the application.

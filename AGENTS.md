@@ -24,6 +24,7 @@ Solution Root (MyAPI.slnx)
 ├── Kernel/                  # Shared class library — all cross-cutting concerns
 │   ├── Common/              # Result pattern
 │   ├── Configuration/       # Dynamic settings system (Controllers/, Features/)
+│   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (auth, claims)
 │   ├── Entities/            # Entity marker interfaces (audit, soft-delete, domain events)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
@@ -159,10 +160,14 @@ Corresponding file `settings.Payment.json`:
 Standardized context for the current operation scope, providing authentication information.
 
 - **`IScopeContext`** — Interface: `UserId` (`DefaultId?`), `IsAuthenticated`, `Roles`, `Claims`, `GetClaim()`, `GetClaimValues()`, `IsInRole()`, `IsSystem`.
-- **`WebScopeContext`** — Implementation backed by `IHttpContextAccessor`. Extracts user ID from `NameIdentifier` or `sub` claim, parses to `DefaultId`. Caches roles and claims. Has a protected constructor accepting `ClaimsPrincipal` for derived contexts. Implements `IsSystem => IsInRole(Roles.System)`.
-- **`Roles`** — Static class with string role constants. `Roles.System = "System"` is the super-user role with unrestricted access.
+- **`WebScopeContext`** — Implementation backed by `IHttpContextAccessor`. Extracts user ID from `NameIdentifier` or `sub` claim, parses to `DefaultId`. Caches roles and claims. Has a protected constructor accepting `ClaimsPrincipal` for derived contexts. Implements `IsSystem => IsInRole(Constants.Roles.System)`.
 
 > **Convention:** Inject `IScopeContext` into handlers and services. For non-web contexts (workers, event handlers), create a derived context.
+
+#### Constants (`Kernel/Constants/`)
+Application-wide constants.
+
+- **`Roles`** — Static class with string role constants. `Roles.System = "System"` is the super-user role with unrestricted access.
 
 > **System role:** Use `[Authorize(Roles = Roles.System)]` on kernel/host administrative endpoints (health details, dynamic settings mutation, partition info). The `IScopeContext.IsSystem` shorthand checks this role. See the [System Role](#system-role) section for full details.
 
@@ -234,9 +239,9 @@ Centralized JSON serializer with consistent configuration.
 For distributing work across multiple API instances.
 
 - **`IPartitionManager`** — `GetRandomPartition()`.
-- **`PartitionManager`** — Depends on `InstanceSettings`. Returns a random `int` in `[Partition.Start, Partition.End]` using `Random.Shared`.
+- **`PartitionManager`** — Depends on `ApplicationSettings`. Returns a random `int` in `[0, PartitionAmount - 1]` using `Random.Shared`.
 
-> **Convention:** Use `IPartitionManager.GetRandomPartition()` when writing outbox messages to assign a partition. Each instance owns a range of partition numbers configured in `settings.Instance.json`.
+> **Convention:** Use `IPartitionManager.GetRandomPartition()` when writing outbox messages to assign a partition. Each instance owns a range of partition numbers configured in `settings.Instance.json` for processing.
 
 #### Global Usings (`GlobalUsings.Shared.cs`)
 ```csharp
@@ -450,9 +455,9 @@ Alternatively, to perform these steps manually:
 The `Roles.System` constant (`"System"`) represents a super-user role with unrestricted access to all operations, including kernel-level administrative endpoints.
 
 ### Files
-- **`Kernel/Context/Roles.cs`** — `public static class Roles { public const string System = "System"; }`
+- **`Kernel/Constants/Roles.cs`** — `public static class Roles { public const string System = "System"; }`
 - **`IScopeContext.IsSystem`** — Shorthand for `IsInRole(Roles.System)`
-- **`WebScopeContext.IsSystem`** — Implemented as `IsInRole(Context.Roles.System)`
+- **`WebScopeContext.IsSystem`** — Implemented as `IsInRole(Constants.Roles.System)`
 
 ### Usage
 
@@ -532,7 +537,7 @@ Kernel → (no project references, only NuGet packages)
 | New kernel DI registration | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`AddKernel`) |
 | New kernel pipeline step | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`UseKernel`) |
 | New kernel extension method (feature-local) | Feature-local `WebApplicationBuilderExtensions.cs` |
-| New role constant | `Kernel/Context/Roles.cs` |
+| New role constant | `Kernel/Constants/Roles.cs` |
 | New static host-level setting | `Host/appsettings.json` (ASP.NET static configuration, e.g. Logging, AllowedHosts) |
 | New runtime-mutable setting | New `DynamicSettingsSection` subclass with `SectionName` + `settings.{SectionName}.json` file |
 | New module | `Modules/{ModuleName}/` (use `modular-webapi-module` template) |

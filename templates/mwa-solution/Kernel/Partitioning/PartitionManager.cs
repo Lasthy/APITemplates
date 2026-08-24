@@ -4,36 +4,36 @@ namespace Kernel.Partitioning;
 
 /// <summary>
 /// Default implementation of <see cref="IPartitionManager"/>.
-/// Generates a random partition number within the range owned by this instance,
-/// as configured in <c>settings.Instance.json</c> → <c>InstanceSettings.Partition</c>.
+/// Generates a random partition number within the total partition space,
+/// as configured in <c>settings.Application.json</c> → <c>ApplicationSettings.PartitionAmount</c>.
 /// </summary>
 public class PartitionManager : IPartitionManager
 {
-    private readonly InstanceSettings _instanceSettings;
+    private readonly ApplicationSettings _applicationSettings;
 
-    public PartitionManager(InstanceSettings instanceSettings)
+    public PartitionManager(ApplicationSettings applicationSettings)
     {
-        _instanceSettings = instanceSettings;
+        _applicationSettings = applicationSettings;
     }
 
     /// <summary>
-    /// Returns a random partition number in the range [Start, End] assigned to this instance.
+    /// Returns a random partition number in the range [0, PartitionAmount - 1] as configured in application settings.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the partition range is invalid (Start > End).
+    /// Thrown when PartitionAmount is less than or equal to 0.
     /// </exception>
     public int GetRandomPartition()
     {
-        var (start, end) = _instanceSettings.Partition;
+        var amount = _applicationSettings.PartitionAmount;
 
-        if (start > end)
+        if (amount <= 0)
         {
             throw new InvalidOperationException(
-                $"Invalid partition range configured: Start ({start}) > End ({end}). " +
-                $"Check InstanceSettings in settings.Instance.json.");
+                $"Invalid PartitionAmount configured: {amount}. PartitionAmount must be greater than 0. " +
+                $"Check ApplicationSettings in settings.Application.json.");
         }
 
         // Random.Shared is thread-safe in .NET 6+.
-        return Random.Shared.Next(start, end + 1);
+        return Random.Shared.Next(amount);
     }
 }
