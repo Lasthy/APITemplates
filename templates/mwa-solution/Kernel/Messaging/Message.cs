@@ -64,4 +64,54 @@ public class Message
 	public void IncrementRetryAttempts() {
 		RetryCount++;
 	}
+
+	/// <summary>
+	/// Marks the message as currently being processed.
+	/// </summary>
+	public void MarkProcessing()
+	{
+		ProcessingAt = DateTime.UtcNow;
+	}
+
+	/// <summary>
+	/// Marks the message as successfully processed.
+	/// </summary>
+	public void MarkProcessed()
+	{
+		ProcessedAt = DateTime.UtcNow;
+		ProcessingAt = null;
+		LastError = null;
+	}
+
+	/// <summary>
+	/// Marks the message as failed, increments retry count, updates error details,
+	/// and sets the next retry timestamp based on exponential backoff.
+	/// </summary>
+	public void MarkFailed(string error, TimeSpan? retryDelay = null, bool maxRetriesReached = false)
+	{
+		IncrementRetryAttempts();
+		ProcessingAt = null;
+		LastError = error;
+		NextRetryAt = maxRetriesReached ? null : (DateTime.UtcNow + (retryDelay ?? TimeSpan.Zero));
+	}
+
+	/// <summary>
+	/// Marks the message as timed out from a prior stuck processing attempt,
+	/// increments retry count, and schedules retry.
+	/// </summary>
+	public void MarkTimedOut(TimeSpan? retryDelay = null, bool maxRetriesReached = false)
+	{
+		IncrementRetryAttempts();
+		ProcessingAt = null;
+		LastError = $"Message processing timed out after attempt {RetryCount}.";
+		NextRetryAt = maxRetriesReached ? null : (DateTime.UtcNow + (retryDelay ?? TimeSpan.Zero));
+	}
+
+	/// <summary>
+	/// Determines if the message has been in the processing state longer than the specified timeout duration.
+	/// </summary>
+	public bool IsProcessingTimedOut(TimeSpan timeout)
+	{
+		return ProcessedAt == null && ProcessingAt.HasValue && ProcessingAt.Value.Add(timeout) < DateTime.UtcNow;
+	}
 }

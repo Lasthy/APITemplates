@@ -1,4 +1,5 @@
 using Kernel.Json;
+using Kernel.Partitioning;
 
 namespace Kernel.Configuration;
 
@@ -28,9 +29,9 @@ public class InstanceSettings : DynamicSettingsSection
     /// <summary>
     /// The partition range owned by this instance for outbox message distribution.
     /// </summary>
-    public (int Start, int End) Partition
+    public PartitionRange Partition
     {
-        get => GetValue<(int Start, int End)>(nameof(Partition));
+        get => GetValue<PartitionRange>(nameof(Partition));
     }
 
     /// <summary>

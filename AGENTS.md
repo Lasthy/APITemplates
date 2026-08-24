@@ -72,6 +72,7 @@ The executable ASP.NET web application. This is the composition root.
 | `settings.Data.json` | Dynamic settings for data/database: `Provider`, `ConnectionString`. |
 | `settings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `settings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
+| `settings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -210,14 +211,20 @@ Infrastructure for pluggable modules.
 > **Convention:** Each module project must have exactly one class implementing `IModule`. The class name doesn't matter; it's discovered by interface. The module assembly name must match the key in `ActiveModules`.
 
 #### Messaging / Outbox (`Kernel/Messaging/`)
-A channel-based message persistence and processing system (outbox pattern).
+A channel-based message persistence, partition-sharded background processing, and retention system (outbox pattern).
 
-- **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`.
+- **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`. Exposes state helper methods: `MarkProcessing()`, `MarkProcessed()`, `MarkFailed()`, `MarkTimedOut()`, `IsProcessingTimedOut()`.
 - **`MessageChannel`** — Enum: `Event`, `Email`.
-- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition, persists to `IKernelDbContext.Messages`.
+- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition via `IPartitionManager`, persists to `IKernelDbContext.Messages`.
 - **`IMessageProcessor`** — Per-channel processor: `GetChannel()`, `ProcessMessage()`.
 - **`EventMessageProcessor`** — Processes `MessageChannel.Event` messages: resolves event type via `IEventTypeRegistry`, deserializes, publishes to `IEventBus` within a `TransactionScope`.
-- **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages to the correct `IMessageProcessor` by channel.
+- **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages to the correct `IMessageProcessor` by channel, returning `Task<Result>`.
+- **`MessageProcessingWorker`** — Hosted `BaseWorker` running on `ProcessingIntervalSeconds`:
+  - **Partitioning**: Only processes messages matching `instanceSettings.Partition` (`[Start..End]`).
+  - **Stuck/Timeout Recovery**: Detects messages in `ProcessingAt` exceeding `ProcessingTimeoutSeconds` and marks them timed out for retry.
+  - **Exponential Backoff**: Reschedules failed messages with exponential delay ($2^{\text{retry}-1} \times \text{InitialDelay}$, capped at `MaxRetryDelaySeconds`) until `MaxRetryAttempts`.
+- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages older than `CleanupRetentionDays` (and optionally permanently failed messages).
+- **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
 
 > **Note:** The `Message` class and related types use `Kernel.Boxing` namespace (not `Kernel.Messaging`). This is the current convention.
 

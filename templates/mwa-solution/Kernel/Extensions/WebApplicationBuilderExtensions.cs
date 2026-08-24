@@ -10,6 +10,7 @@ using Kernel.Health.Controllers;
 using Kernel.Health.Features;
 using Kernel.Json;
 using Kernel.Messaging;
+using Kernel.Messaging.Workers;
 using Kernel.Modules;
 using Kernel.Partitioning;
 using Kernel.Persistence;
@@ -43,10 +44,13 @@ public static class WebApplicationBuilderExtensions
     ///   <item><see cref="DynamicSettings"/> — singleton, environment-aware.</item>
     ///   <item><see cref="ApplicationSettings"/> — singleton, loaded from <c>settings.Application.json</c>.</item>
     ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>settings.Instance.json</c>.</item>
+    ///   <item><see cref="MessagingSettings"/> — singleton, loaded from <c>settings.Messaging.json</c>.</item>
     ///   <item><see cref="IPartitionManager"/> — singleton, backed by <see cref="PartitionManager"/>.</item>
     ///   <item><see cref="IMessageWriter"/> — scoped, backed by <see cref="MessageWriter"/>.</item>
     ///   <item><see cref="IMessageDispatcher"/> — scoped, backed by <see cref="MessageDispatcher"/>.</item>
     ///   <item><see cref="IMessageProcessor"/> (Event channel) — scoped, backed by <see cref="EventMessageProcessor"/>.</item>
+    ///   <item><see cref="MessageProcessingWorker"/> — hosted background service.</item>
+    ///   <item><see cref="MessageCleanupWorker"/> — hosted background service.</item>
     ///   <item>OpenAPI document named <c>"kernel"</c>.</item>
     /// </list>
     /// </remarks>
@@ -83,9 +87,13 @@ public static class WebApplicationBuilderExtensions
         var instanceSettings = new InstanceSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(instanceSettings);
 
+        var messagingSettings = new MessagingSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(messagingSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(applicationSettings);
         builder.Services.AddSingleton(instanceSettings);
+        builder.Services.AddSingleton(messagingSettings);
 
         // ── Partition manager ─────────────────────────────────────────────────
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
@@ -94,6 +102,8 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IMessageWriter, MessageWriter>();
         builder.Services.AddScoped<IMessageDispatcher, MessageDispatcher>();
         builder.Services.AddScoped<IMessageProcessor, EventMessageProcessor>();
+        builder.Services.AddHostedService<MessageProcessingWorker>();
+        builder.Services.AddHostedService<MessageCleanupWorker>();
 
         // ── Controllers ───────────────────────────────────────────────────────
         builder.Services.AddControllers().AddApplicationPart(typeof(SettingsController).Assembly);

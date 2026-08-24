@@ -66,6 +66,7 @@ The executable ASP.NET web application. This is the composition root.
 | `settings.Data.json` | Dynamic settings for data/database: `Provider`, `ConnectionString`. |
 | `settings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `settings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
+| `settings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -135,6 +136,20 @@ Standardized context for the current operation scope, providing authentication a
   - Calls `ExecuteJobAsync(IServiceProvider services, CancellationToken ct)`
   - Error handling with structured logging
   - Supports `RequestCancellation()` for graceful self-stop.
+
+### Messaging & Outbox (`Kernel/Messaging/`)
+Channel-based outbox message persistence, partition-sharded background processing, fault tolerance, and retention management:
+
+- **`Message`** — Entity storing serialized payload, CLR type, channel, partition, and lifecycle timestamps (`OccurredAt`, `ProcessingAt`, `ProcessedAt`, `NextRetryAt`, `RetryCount`, `LastError`).
+- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a random partition via `IPartitionManager`, and persists to `IKernelDbContext.Messages`.
+- **`IMessageProcessor`** — Per-channel processing contract (`GetChannel()`, `ProcessMessage()`). Default implementation: `EventMessageProcessor` for `MessageChannel.Event`.
+- **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages by channel to their corresponding processor, returning `Task<Result>`.
+- **`MessageProcessingWorker`** — Hosted `BaseWorker` running on `ProcessingIntervalSeconds`:
+  - **Partitioning**: Only processes messages matching `instanceSettings.Partition` (`[Start..End]`).
+  - **Stuck/Timeout Recovery**: Detects messages in `ProcessingAt` exceeding `ProcessingTimeoutSeconds` and marks them timed out for retry.
+  - **Exponential Backoff**: Reschedules failed messages with exponential delay ($2^{\text{retry}-1} \times \text{InitialDelay}$, capped at `MaxRetryDelaySeconds`) until `MaxRetryAttempts`.
+- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages older than `CleanupRetentionDays` (and optionally permanently failed messages).
+- **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
 
 ### Request/Response & Interceptors (`Kernel/Requests/`)
 MediatR-style CQRS pattern with attribute-based interceptors:

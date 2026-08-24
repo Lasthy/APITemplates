@@ -1,0 +1,11 @@
+{
+  "ProcessingIntervalSeconds": 5,
+  "ProcessingBatchSize": 20,
+  "ProcessingTimeoutSeconds": 300,
+  "MaxRetryAttempts": 5,
+  "InitialRetryDelaySeconds": 2,
+  "MaxRetryDelaySeconds": 3600,
+  "CleanupIntervalHours": 24,
+  "CleanupRetentionDays": 7,
+  "DeleteFailedMessagesOnCleanup": false
+}
