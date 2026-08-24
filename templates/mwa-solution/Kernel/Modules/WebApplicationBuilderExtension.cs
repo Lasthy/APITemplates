@@ -1,5 +1,6 @@
 using Kernel.Configuration;
 using Kernel.Events;
+using Kernel.Health;
 using Kernel.Json;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
@@ -133,6 +134,17 @@ public static class WebApplicationBuilderExtension
         // Register all IRequestHandler<,> implementations from the module's assembly.
         RegisterRequestHandlers(builder.Services, typeof(T).Assembly);
 
+        // Discover and register all IHealthCheck implementations from the module's assembly.
+        var healthCheckRegistry = builder.Services
+            .Where(d => d.ServiceType == typeof(IHealthCheckRegistry))
+            .Select(d => d.ImplementationInstance as IHealthCheckRegistry)
+            .FirstOrDefault();
+
+        if (healthCheckRegistry != null)
+        {
+            RegisterHealthChecks(builder.Services, healthCheckRegistry, T.Name, typeof(T).Assembly);
+        }
+
         // Record in the ModuleRegistry for post-build MapEndpoints and event type wiring.
         var registry = builder.Services
             .Where(d => d.ServiceType == typeof(ModuleRegistry))
@@ -252,6 +264,26 @@ public static class WebApplicationBuilderExtension
             {
                 services.AddScoped(@interface, implementation);
             }
+        }
+    }
+
+    private static void RegisterHealthChecks(
+        IServiceCollection services,
+        IHealthCheckRegistry healthCheckRegistry,
+        string moduleName,
+        Assembly assembly)
+    {
+        var checkTypes = assembly.GetTypes()
+            .Where(t =>
+                !t.IsAbstract &&
+                !t.IsInterface &&
+                typeof(IHealthCheck).IsAssignableFrom(t))
+            .ToList();
+
+        foreach (var checkType in checkTypes)
+        {
+            services.AddScoped(checkType);
+            healthCheckRegistry.Register(moduleName, checkType);
         }
     }
 }

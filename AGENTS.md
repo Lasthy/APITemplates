@@ -281,16 +281,27 @@ A MediatR-style CQRS pattern with an attribute-based interceptor pipeline.
 #### EF Core Persistence Implementation (`Data/Persistence/`)
 - **`KernelDbContext`** — Implements `IKernelDbContext`, inherits `DbContext`. Registered in DI via `builder.AddData()`.
 
----
-
-### 🔲 Stub / Not Yet Implemented
-
 #### Health Checks (`Kernel/Health/`)
-Both classes are empty stubs:
-- `HealthReport` — Should aggregate health info per-module.
-- `HealthReportComponent` — Should represent a single health check within a module.
+A modular health reporting system that groups health checks by module, calculates aggregate status levels, provides liveness/readiness probes, and exposes detailed diagnostics.
 
-> **Design intent:** Each module registers its own health checks. The health system groups and reports them by module.
+- **`HealthStatus`** — Enum (`Healthy`, `Degraded`, `Unhealthy`) with string JSON serialization and `Combine` extension method.
+- **`HealthCheckResult`** — Result record for individual check outcomes (`Status`, `Description`, `Exception`, `Data`). Factory methods: `Healthy()`, `Degraded()`, `Unhealthy()`.
+- **`HealthReportComponent`** — Diagnostic report for an executed check (`Name`, `Status`, `Description`, `Duration`, `Data`, `Error`).
+- **`ModuleHealthReport`** — Aggregates component checks and status for a specific module (`ModuleName`, `Status`, `Duration`, `Components`).
+- **`HealthReport`** — Overall system health report (`Status`, `TotalDuration`, `Timestamp`, `Modules`).
+- **`IHealthCheck`** — Interface: `Name`, `CheckHealthAsync(ct)`. Implement this in any module or Kernel layer.
+- **`IHealthCheckRegistry` / `HealthCheckRegistry`** — Thread-safe singleton registry storing health checks grouped by module. Supports type registration, delegates, and assembly scanning.
+- **`IHealthService` / `HealthService`** — Scoped service that executes health checks with duration tracking (`Stopwatch`), catches unhandled exceptions, and compiles reports.
+- **`MemoryHealthCheck`** (`Kernel/Health/Checks/`) — Built-in health check monitoring memory allocation and GC collection metrics.
+- **`DatabaseHealthCheck`** (`Data/Health/`) — Built-in health check testing database connectivity via `IKernelDbContext.Database.CanConnectAsync()`.
+- **`HealthController`** (`Kernel/Health/Controllers/HealthController.cs`) — ASP.NET Core controller at route `api/v1/kernel/health` (tagged in `kernel` OpenAPI group):
+  - `GET api/v1/kernel/health/live` (`[AllowAnonymous]`) — Liveness probe (200 OK).
+  - `GET api/v1/kernel/health/ready` (`[AllowAnonymous]`) — Readiness probe (200 OK or 503 Service Unavailable).
+  - `GET api/v1/kernel/health/report` (`[Authorize(Roles = Roles.System)]`) — Full system health report breakdown.
+  - `GET api/v1/kernel/health/report/{moduleName}` (`[Authorize(Roles = Roles.System)]`) — Detailed module health report.
+- **Features** (`Kernel/Health/Features/`) — CQRS requests and handlers: `GetHealthReport` / `GetHealthReportHandler`, `GetModuleHealthReport` / `GetModuleHealthReportHandler`.
+
+> **Convention:** Place module-specific health checks anywhere in your module assembly implementing `IHealthCheck`. The module registration (`AddModule<T>`) automatically discovers and registers all `IHealthCheck` implementations under the module name. Public health probes (`/live`, `/ready`) do not require authorization, whereas detailed reports (`/report`, `/report/{moduleName}`) require `Roles.System`.
 
 ---
 

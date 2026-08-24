@@ -13,6 +13,8 @@ namespace MyModule;
 /// This class is discovered automatically by the Kernel's <c>AddModules()</c> extension method.
 /// To activate this module, set <c>"MyModule": true</c> in <c>ActiveModules</c>
 /// inside <c>settings.Instance.json</c>.
+/// Any class implementing <see cref="Kernel.Health.IHealthCheck"/> within this assembly is
+/// automatically discovered and registered under this module's health checks.
 /// </remarks>
 public class MyModuleModule : IModule
 {

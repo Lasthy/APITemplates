@@ -4,6 +4,10 @@ using Kernel.Configuration.Controllers;
 using Kernel.Configuration.Features;
 using Kernel.Context;
 using Kernel.Events;
+using Kernel.Health;
+using Kernel.Health.Checks;
+using Kernel.Health.Controllers;
+using Kernel.Health.Features;
 using Kernel.Json;
 using Kernel.Messaging;
 using Kernel.Modules;
@@ -34,6 +38,8 @@ public static class WebApplicationBuilderExtensions
     ///   <item><see cref="IScopeContext"/> — scoped, backed by <see cref="WebScopeContext"/>.</item>
     ///   <item><see cref="IEventBus"/> — singleton, backed by <see cref="InProcessEventBus"/>.</item>
     ///   <item><see cref="IEventTypeRegistry"/> — singleton, backed by <see cref="EventTypeRegistry"/>.</item>
+    ///   <item><see cref="IHealthCheckRegistry"/> — singleton, backed by <see cref="HealthCheckRegistry"/>.</item>
+    ///   <item><see cref="IHealthService"/> — scoped, backed by <see cref="HealthService"/>.</item>
     ///   <item><see cref="DynamicSettings"/> — singleton, environment-aware.</item>
     ///   <item><see cref="ApplicationSettings"/> — singleton, loaded from <c>settings.Application.json</c>.</item>
     ///   <item><see cref="InstanceSettings"/> — singleton, loaded from <c>settings.Instance.json</c>.</item>
@@ -57,6 +63,13 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
         builder.Services.AddSingleton<IEventTypeRegistry, EventTypeRegistry>();
         builder.Services.AddSingleton(new ModuleRegistry());
+
+        // ── Health check infrastructure ───────────────────────────────────────
+        var healthCheckRegistry = new HealthCheckRegistry();
+        healthCheckRegistry.Register<MemoryHealthCheck>("Kernel");
+        builder.Services.AddSingleton<IHealthCheckRegistry>(healthCheckRegistry);
+        builder.Services.AddScoped<IHealthService, HealthService>();
+        builder.Services.AddScoped<MemoryHealthCheck>();
 
         // ── Dynamic Settings ──────────────────────────────────────────────────
         var environment = builder.Environment.EnvironmentName;
@@ -85,12 +98,14 @@ public static class WebApplicationBuilderExtensions
         // ── Controllers ───────────────────────────────────────────────────────
         builder.Services.AddControllers().AddApplicationPart(typeof(SettingsController).Assembly);
 
-        // ── Configuration Features ───────────────────────────────────────────
+        // ── Configuration & Health Features ───────────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
         builder.Services.AddTransient<LoggingInterceptor>();
         builder.Services.AddTransient<TransactionInterceptor>();
         builder.Services.AddScoped<IRequestHandler<GetSettings, string>, GetSettingsHandler>();
         builder.Services.AddScoped<IRequestHandler<UpdateSettings, bool>, UpdateSettingsHandler>();
+        builder.Services.AddScoped<IRequestHandler<GetHealthReport, HealthReport>, GetHealthReportHandler>();
+        builder.Services.AddScoped<IRequestHandler<GetModuleHealthReport, ModuleHealthReport>, GetModuleHealthReportHandler>();
 
         // ── Persistence Interceptors ──────────────────────────────────────────
         builder.Services.AddScoped<ISaveChangesInterceptor, SoftDeleteSaveChangesInterceptor>();

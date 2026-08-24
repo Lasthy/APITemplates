@@ -163,7 +163,19 @@ Pluggable module architecture:
   - `static abstract string Name` — module identifier; must match the key in `ActiveModules`.
   - `static abstract void Register(IServiceCollection, IConfiguration)` — DI registration.
   - `static abstract void MapEndpoints(IEndpointRouteBuilder)` — route registration.
-- **`AddModules()`** / **`UseModules()`** — Discovers active modules from `settings.Instance.json`, registers dynamic settings, scans and registers event handlers (`IEventHandler<>`) and request handlers (`IRequestHandler<,>`), registers OpenAPI docs, and maps endpoints.
+- **`AddModules()`** / **`UseModules()`** — Discovers active modules from `settings.Instance.json`, registers dynamic settings, scans and registers event handlers (`IEventHandler<>`), request handlers (`IRequestHandler<,>`), and health checks (`IHealthCheck`), registers OpenAPI docs, and maps endpoints.
+
+### Health Checks (`Kernel/Health/`)
+Modular health report system grouped by module:
+
+- **`IHealthCheck`** — Interface: `Name`, `CheckHealthAsync(ct)` returning `HealthCheckResult` (`Healthy`, `Degraded`, `Unhealthy`).
+- **`HealthReport`** & **`ModuleHealthReport`** & **`HealthReportComponent`** — Hierarchical health aggregation.
+- **`IHealthCheckRegistry`** & **`IHealthService`** — Auto-discovers module health checks, executes checks, and measures duration.
+- **Endpoints**:
+  - `GET api/v1/kernel/health/live` (`[AllowAnonymous]`) — Liveness probe (200 OK).
+  - `GET api/v1/kernel/health/ready` (`[AllowAnonymous]`) — Readiness probe (200 OK or 503).
+  - `GET api/v1/kernel/health/report` (`[Authorize(Roles = Roles.System)]`) — Full system health report.
+  - `GET api/v1/kernel/health/report/{moduleName}` (`[Authorize(Roles = Roles.System)]`) — Module health report.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

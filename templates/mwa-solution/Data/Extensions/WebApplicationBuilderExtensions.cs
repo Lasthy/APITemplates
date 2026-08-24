@@ -1,6 +1,8 @@
 using Data.Configuration;
+using Data.Health;
 using Data.Persistence;
 using Kernel.Configuration;
+using Kernel.Health;
 using Kernel.Json;
 using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
@@ -45,5 +47,14 @@ public static class WebApplicationBuilderExtensions
         });
 
         builder.Services.AddScoped<IKernelDbContext>(sp => sp.GetRequiredService<KernelDbContext>());
+
+        // Register Database Health Check
+        builder.Services.AddScoped<DatabaseHealthCheck>();
+        var healthCheckRegistry = builder.Services
+            .Where(d => d.ServiceType == typeof(IHealthCheckRegistry))
+            .Select(d => d.ImplementationInstance as IHealthCheckRegistry)
+            .FirstOrDefault();
+
+        healthCheckRegistry?.Register<DatabaseHealthCheck>("Data");
     }
 }
