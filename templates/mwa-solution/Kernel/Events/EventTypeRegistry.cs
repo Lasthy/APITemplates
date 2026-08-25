@@ -33,19 +33,49 @@ public sealed class EventTypeRegistry : IEventTypeRegistry
     }
 
     /// <summary>
-    /// Registers all concrete event types found in the specified assembly.
+    /// Registers all concrete event types found in the specified assembly and its referenced assemblies.
     /// </summary>
     public void RegisterFromAssembly(Assembly assembly)
     {
-        var types = assembly
-            .GetTypes()
-            .Where(t =>
-                typeof(IEvent).IsAssignableFrom(t) &&
-                !t.IsAbstract &&
-                !t.IsInterface);
+        RegisterTypesFromAssembly(assembly);
 
-        foreach (var type in types)
-            Register(type);
+        // Also scan referenced assemblies (e.g. companion .Contracts assemblies)
+        var referencedAssemblyNames = assembly.GetReferencedAssemblies();
+        foreach (var assemblyName in referencedAssemblyNames)
+        {
+            try
+            {
+                var refAssembly = Assembly.Load(assemblyName);
+                RegisterTypesFromAssembly(refAssembly);
+            }
+            catch
+            {
+                // Ignore assemblies that cannot be loaded
+            }
+        }
+    }
+
+    private void RegisterTypesFromAssembly(Assembly assembly)
+    {
+        try
+        {
+            var types = assembly
+                .GetTypes()
+                .Where(t =>
+                    typeof(IEvent).IsAssignableFrom(t) &&
+                    !t.IsAbstract &&
+                    !t.IsInterface);
+
+            foreach (var type in types)
+                Register(type);
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            foreach (var type in ex.Types.Where(t => t != null && typeof(IEvent).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                Register(type!);
+            }
+        }
     }
 
     private void Register(Type type)

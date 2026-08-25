@@ -1,32 +1,42 @@
 # MyModule — Module Agent Guide
 
-This project is a self-contained **Modular Web API (MWA)** module. It encapsulates domain logic, API endpoints, background workers, event handlers, and data persistence for the `MyModule` feature area.
+This project is a self-contained **Modular Web API (MWA)** module. It encapsulates domain logic, API endpoints, background workers, event handlers, and data persistence for the `MyModule` feature area, paired with its companion public contracts library `MyModule.Contracts`.
 
 ---
 
 ## Module Anatomy
 
 ```
-Modules/MyModule/
-├── Features/                              # CQRS requests & handlers (vertical slices)
-│   ├── CreateItem/                        # Example feature slice
-│   │   ├── CreateItem.cs                  # Command/Query record (no "Request" suffix)
-│   │   └── CreateItemHandler.cs           # Handler returning Result<T>
-├── Controllers/                           # Optional controller classes (if not using Minimal APIs)
-├── Entities/                              # Domain entity definitions
-├── Events/                                # Event definitions & event handlers
-│   ├── ItemCreatedEvent.cs                # Event record inheriting from Event
-│   └── ItemCreatedEventHandler.cs         # Implements IEventHandler<ItemCreatedEvent>
-├── Workers/                               # Module background workers
-│   └── MyModuleSyncWorker.cs              # Inherits BaseWorker (periodic or one-shot)
-├── Configuration/                         # Optional custom DynamicSettingsSection
-│   └── MyModuleSettings.cs                # Inherits DynamicSettingsSection
-├── Persistence/                           # Module EF Core DbContext & configurations
-├── MyModuleModule.cs                      # IModule entry point (Register, Policies, MapEndpoints)
-├── appsettings.MyModule.json                 # Module dynamic settings (base)
-├── appsettings.MyModule.Development.json     # Module dynamic settings (Dev overlay)
-├── MyModule.csproj                        # Project references Kernel (and Data if using EF)
-└── AGENTS.md                              # This module guide
+Modules/
+├── MyModule/                                  # Module implementation
+│   ├── Features/                              # CQRS requests & handlers (vertical slices)
+│   │   ├── CreateItem/                        # Internal feature slice
+│   │   │   ├── CreateItem.cs                  # Command/Query record
+│   │   │   └── CreateItemHandler.cs           # Handler returning Result<T>
+│   │   └── GetMyModuleSummaryHandler.cs       # Implements IRequestHandler from Contracts
+│   ├── Controllers/                           # Optional controller classes (if not using Minimal APIs)
+│   ├── Entities/                              # Domain entity definitions
+│   ├── Events/                                # Internal events & event handlers
+│   │   └── ItemCreatedEventHandler.cs         # Implements IEventHandler<ItemCreatedEvent>
+│   ├── Workers/                               # Module background workers
+│   │   └── MyModuleSyncWorker.cs              # Inherits BaseWorker (periodic or one-shot)
+│   ├── Configuration/                         # Optional custom DynamicSettingsSection
+│   │   └── MyModuleSettings.cs                # Inherits DynamicSettingsSection
+│   ├── Persistence/                           # Module EF Core DbContext & configurations
+│   ├── MyModuleModule.cs                      # IModule entry point (Register, Policies, MapEndpoints)
+│   ├── appsettings.MyModule.json              # Module dynamic settings (base)
+│   ├── appsettings.MyModule.Development.json  # Module dynamic settings (Dev overlay)
+│   ├── MyModule.csproj                        # References Kernel & MyModule.Contracts
+│   └── AGENTS.md                              # This module guide
+│
+└── MyModule.Contracts/                        # Companion public contracts (shareable)
+    ├── Dtos/                                  # Public DTO records
+    │   └── MyModuleSummaryDto.cs
+    ├── Events/                                # Public domain event records (inheriting Event)
+    │   └── MyModuleCreatedEvent.cs
+    ├── Requests/                              # Public CQRS requests (implementing IRequest<T>)
+    │   └── GetMyModuleSummary.cs
+    └── MyModule.Contracts.csproj              # References Kernel only
 ```
 
 ---
@@ -77,7 +87,66 @@ To enable this module, ensure `"MyModule": true` is set in `Host/appsettings.Ins
 
 ---
 
-## 2. API Endpoints & Routing
+## 2. Cross-Module Communication
+
+### Rule: Companion Contracts Only
+A module must **never** reference another module's implementation project. To interact with another module (e.g. `Orders`), reference its companion contracts library:
+
+```xml
+<!-- In AnotherModule.csproj -->
+<ItemGroup>
+  <ProjectReference Include="../Orders.Contracts/Orders.Contracts.csproj" />
+</ItemGroup>
+```
+
+### Synchronous Queries/Commands (via `IDispatcher`)
+1. In `MyModule.Contracts/Requests/GetMyModuleSummary.cs`:
+   ```csharp
+   public record GetMyModuleSummary(DefaultId Id) : IRequest<MyModuleSummaryDto>;
+   ```
+2. In `MyModule/Features/GetMyModuleSummaryHandler.cs`:
+   ```csharp
+   public class GetMyModuleSummaryHandler : IRequestHandler<GetMyModuleSummary, MyModuleSummaryDto>
+   {
+       public async Task<Result<MyModuleSummaryDto>> HandleAsync(GetMyModuleSummary request, CancellationToken ct)
+       {
+           return Result.Success(new MyModuleSummaryDto(request.Id, "Sample", true));
+       }
+   }
+   ```
+3. In another module (e.g. `Billing`), inject `IDispatcher`:
+   ```csharp
+   var result = await dispatcher.DispatchAsync(new GetMyModuleSummary(id), ct);
+   if (result.IsSuccess)
+   {
+       var summary = result.Value;
+   }
+   ```
+
+### Asynchronous Pub/Sub Events (via `IEventBus`)
+1. In `MyModule.Contracts/Events/MyModuleCreatedEvent.cs`:
+   ```csharp
+   public record MyModuleCreatedEvent(DefaultId Id, string Name) : Event;
+   ```
+2. In `MyModule`, publish when changes occur:
+   ```csharp
+   await eventBus.PublishAsync(new MyModuleCreatedEvent(id, name), ct);
+   ```
+3. In another module, implement `IEventHandler<MyModuleCreatedEvent>`:
+   ```csharp
+   public class OnMyModuleCreatedHandler : IEventHandler<MyModuleCreatedEvent>
+   {
+       public Task HandleAsync(MyModuleCreatedEvent @event, CancellationToken ct = default)
+       {
+           // Handle event from MyModule
+           return Task.CompletedTask;
+       }
+   }
+   ```
+
+---
+
+## 3. API Endpoints & Routing
 
 - **Route prefix**: All module routes must follow the pattern `api/v1/{module-name}` (e.g. `/api/v1/mymodule`).
 - **OpenAPI grouping**: Always call `.WithTags(Name).WithGroupName(Name)` on route groups so endpoints appear under the module's dedicated OpenAPI document (`/openapi/MyModule.json`).
@@ -85,52 +154,18 @@ To enable this module, ensure `"MyModule": true` is set in `Host/appsettings.Ins
 
 ---
 
-## 3. CQRS & Feature Organization
+## 4. CQRS & Feature Organization
 
-Organize business logic into vertical slices inside the `Features/` directory:
+Organize internal business logic into vertical slices inside the `Features/` directory:
 
 - **Requests / Commands / Queries**: Implement `IRequest<TResponse>`. Name them directly as verbs/actions (e.g., `CreateItem`, `GetItems`, `UpdateItemStatus`). **Do not** append `Request` to the class/record name.
 - **Handlers**: Implement `IRequestHandler<TRequest, TResponse>`. Name them with the `Handler` suffix (e.g., `CreateItemHandler`, `GetItemsHandler`). Handlers are automatically discovered and registered by `AddModules()`.
 - **Result pattern**: All handlers must return `Result<TResponse>`. Never throw expected exceptions.
 - **Interceptors**: Decorate handler classes with attributes such as `[Logging]`, `[Transaction]`, or `[Intercept<TCustom>]` with optional `Order = n`.
 
-**Example Feature:**
-```csharp
-// Features/CreateItem.cs
-using Kernel.Requests;
-
-public record CreateItem(string Name, decimal Price) : IRequest<DefaultId>;
-
-// Features/CreateItemHandler.cs
-using Kernel.Common;
-using Kernel.Requests;
-
-[Logging(Order = 1)]
-[Transaction(Order = 2)]
-public class CreateItemHandler : IRequestHandler<CreateItem, DefaultId>
-{
-    private readonly ILogger<CreateItemHandler> _logger;
-
-    public CreateItemHandler(ILogger<CreateItemHandler> logger)
-    {
-        _logger = logger;
-    }
-
-    public async Task<Result<DefaultId>> HandleAsync(CreateItem command, CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(command.Name))
-            return Result.Failure<DefaultId>(new ArgumentException("Item name cannot be empty."));
-
-        var id = DefaultId.NewUlid();
-        // ... save logic ...
-        return Result.Success(id);
-    }
-}
-```
-
 ---
 
-## 4. Dynamic Configuration
+## 5. Dynamic Configuration
 
 Modules have their own `appsettings.MyModule.json` and optional `appsettings.MyModule.Development.json` overlays.
 
@@ -152,7 +187,7 @@ public class MyModuleSettings : DynamicSettingsSection
 
 ---
 
-## 5. Background Workers (`BaseWorker`)
+## 6. Background Workers (`BaseWorker`)
 
 Modules can run background workers by inheriting from `BaseWorker`:
 
@@ -166,7 +201,6 @@ public class ItemSyncWorker(
     protected override async Task ExecuteJobAsync(IServiceProvider services, CancellationToken ct)
     {
         // Scoped services can be resolved from 'services'
-        // var dbContext = services.GetRequiredService<MyModuleDbContext>();
     }
 }
 ```
@@ -192,35 +226,6 @@ services.AddHostedService<ItemSyncWorker>();
 
 ---
 
-## 6. Events & Messaging
-
-### Defining an Event
-Inherit from `Event` (from `Kernel.Events`):
-```csharp
-public record ItemCreatedEvent(DefaultId ItemId, string Name) : Event;
-```
-
-### Handling an Event
-Implement `IEventHandler<TEvent>`. Event handlers in the module assembly are auto-discovered during startup:
-```csharp
-public class ItemCreatedEventHandler(ILogger<ItemCreatedEventHandler> logger) : IEventHandler<ItemCreatedEvent>
-{
-    public Task HandleAsync(ItemCreatedEvent @event, CancellationToken ct = default)
-    {
-        logger.LogInformation("Item {ItemId} created: {Name}", @event.ItemId, @event.Name);
-        return Task.CompletedTask;
-    }
-}
-```
-
-### Publishing an Event
-Inject `IEventBus` and call `PublishAsync`:
-```csharp
-await eventBus.PublishAsync(new ItemCreatedEvent(itemId, name), ct);
-```
-
----
-
 ## 7. Entities & Persistence
 
 - **Identifiers**: Always use `DefaultId` (`System.Ulid`) for primary and foreign keys.
@@ -233,7 +238,7 @@ await eventBus.PublishAsync(new ItemCreatedEvent(itemId, name), ct);
 
 ## 8. Rules & Best Practices
 
-1. **No direct module-to-module dependencies**: A module must never reference another module project. Communicate via events (`IEventBus`) or Kernel shared contracts.
+1. **No direct module-to-module dependencies**: A module must never reference another module project. Reference its companion `*.Contracts` project and communicate via `IDispatcher` or `IEventBus`.
 2. **Never throw expected business exceptions**: Always return `Result.Failure(exception)` or `Result.Success(value)`.
 3. **Use `IJsonSerializer`**: Never use `System.Text.Json.JsonSerializer` directly.
 4. **Use `DefaultId`**: Never use `Guid`, `int`, or raw strings for entity IDs.

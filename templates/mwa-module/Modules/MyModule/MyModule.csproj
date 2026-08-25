@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Kernel/Kernel.csproj" />
+    <ProjectReference Include="../MyModule.Contracts/MyModule.Contracts.csproj" />
   </ItemGroup>
 
   <!-- Include settings files in the build output so the Host can load them at runtime. -->

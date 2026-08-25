@@ -39,7 +39,9 @@ Solution Root (MyAPI.slnx)
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service
 │   └── ThirdParty/          # Third-party license files
-├── Modules/                 # Directory where module projects live (.gitkeep placeholder)
+├── Modules/                 # Directory where module projects live
+│   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints)
+│   └── {ModuleName}.Contracts/ # Companion public contracts (events, requests, DTOs)
 ├── create-module.ps1        # Helper script to scaffold, sln-add, and Host-reference a new module (PowerShell)
 ├── create-module.sh         # Helper script to scaffold, sln-add, and Host-reference a new module (Bash)
 ├── GlobalUsings.Shared.cs   # `global using DefaultId = System.Ulid;`
@@ -50,6 +52,7 @@ Solution Root (MyAPI.slnx)
 
 - **Kernel owns all cross-cutting concerns.** Modules depend on Kernel; Kernel never depends on modules.
 - **Modules are self-contained projects.** Each module has its own `settings.{ModuleName}.json` and implements `IModule` for DI registration.
+- **Companion Contract Projects for Cross-Module Communication.** Modules expose public contracts (events, requests, DTOs) via a companion `{ModuleName}.Contracts` project. A module may reference another module's `.Contracts` project, but **never** its implementation project.
 - **Module activation is config-driven.** The `InstanceSettings` section in `settings.Instance.json` has an `ActiveModules` dictionary (`{ "ModuleName": true/false }`) controlling which modules are loaded at startup.
 - **`DefaultId` is `System.Ulid` everywhere.** Defined in `GlobalUsings.Shared.cs` and propagated to all projects via `Directory.Build.props`.
 
@@ -405,34 +408,28 @@ Module `.csproj` files include `<Content Include="settings.*.json" CopyToOutputD
 
 ## Module Template (`templates/mwa-module/`)
 
-Scaffolds a new module under `Modules/{ModuleName}/`. The template is a **class library** (not a web project) that references `Microsoft.AspNetCore.App`.
+Scaffolds a new module under `Modules/{ModuleName}/` and its companion contracts project under `Modules/{ModuleName}.Contracts/`.
 
-| File | Purpose |
-|---|---|
-| `{Name}Module.cs` | `IModule` implementation with `Name`, `Register()`, and `MapEndpoints()`. |
-| `{Name}.csproj` | `Microsoft.NET.Sdk` library; references Kernel. Includes `settings.*.json` as `Content` with `CopyToOutputDirectory`. |
-| `settings.{Name}.json` | Module-specific dynamic settings (base). |
-| `settings.{Name}.Development.json` | Module-specific development environment overlay. |
-
-**Module IModule implementation pattern:**
-```csharp
-public class MyModuleModule : IModule
-{
-    public static string Name => "MyModule";
-
-    public static void Register(IServiceCollection services, IConfiguration configuration)
-    {
-        // Register services, DbContexts, etc.
-    }
-
-    public static void MapEndpoints(IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/mymodule")
-            .WithTags("MyModule")
-            .WithGroupName(Name);
-        // Map GET/POST/etc. here
-    }
-}
+```
+Modules/
+├── {ModuleName}/                              # Module implementation
+│   ├── Features/                              # CQRS requests & handlers (vertical slices)
+│   ├── Controllers/                           # Optional controller classes
+│   ├── Entities/                              # Domain entity definitions
+│   ├── Events/                                # Internal events & event handlers
+│   ├── Workers/                               # Module background workers
+│   ├── Configuration/                         # DynamicSettingsSection subclasses
+│   ├── Persistence/                           # EF Core DbContext & configurations
+│   ├── {ModuleName}Module.cs                  # IModule entry point
+│   ├── appsettings.{ModuleName}.json          # Module dynamic settings (base)
+│   ├── appsettings.{ModuleName}.Development.json # Development overlay
+│   └── {ModuleName}.csproj                    # References Kernel & {ModuleName}.Contracts
+│
+└── {ModuleName}.Contracts/                    # Companion public contracts (shareable)
+    ├── Dtos/                                  # Public DTO records
+    ├── Events/                                # Public domain event records (inheriting Event)
+    ├── Requests/                              # Public CQRS requests (implementing IRequest<T>)
+    └── {ModuleName}.Contracts.csproj          # References Kernel only
 ```
 
 ### Module Scaffolding & Activation
@@ -449,44 +446,50 @@ or
 ./create-module.sh Orders
 ```
 The script automatically:
-1. Executes `dotnet new mwa-module -n Orders`
-2. Adds the project to the `.slnx` solution under the `Modules` solution folder (`dotnet sln add Modules/Orders/Orders.csproj -s Modules`)
+1. Executes `dotnet new mwa-module -n Orders` (generating both `Orders` and `Orders.Contracts`)
+2. Adds both projects to the `.slnx` solution under the `Modules` solution folder (`dotnet sln add Modules/Orders/Orders.csproj -s Modules` and `dotnet sln add Modules/Orders.Contracts/Orders.Contracts.csproj -s Modules`)
 3. Adds the project reference to `Host/Host.csproj` (`dotnet add Host/Host.csproj reference Modules/Orders/Orders.csproj`)
 
-#### Manual Module Creation & Project References
-Alternatively, to perform these steps manually:
+---
 
-1. **Scaffold the Module:**
-   ```bash
-   dotnet new mwa-module -n MyModule
-   ```
+## Cross-Module Communication
 
-2. **Add to Solution:**
-   ```bash
-   dotnet sln add Modules/MyModule/MyModule.csproj -s Modules
-   ```
+Cross-module communication follows the **Companion Contract Projects (`*.Contracts`)** pattern:
 
-3. **Reference the Module in the Host (`Host/Host.csproj`):**
+### 1. Synchronous Queries/Commands (via `IDispatcher`)
+When `Notifications` needs data from `Orders`:
+1. Reference `Orders.Contracts` in `Notifications.csproj`:
    ```xml
    <ItemGroup>
-     <ProjectReference Include="..\Modules\MyModule\MyModule.csproj" />
+     <ProjectReference Include="../Orders.Contracts/Orders.Contracts.csproj" />
    </ItemGroup>
    ```
-   Or via CLI:
-   ```bash
-   dotnet add Host/Host.csproj reference Modules/MyModule/MyModule.csproj
-   ```
-
-4. **Enable the Module in `Host/settings.Instance.json`:**
-   ```json
+2. In `Notifications`, inject `IDispatcher` and send the request:
+   ```csharp
+   var result = await _dispatcher.DispatchAsync(new GetOrderSummary(orderId), ct);
+   if (result.IsSuccess)
    {
-     "ActiveModules": {
-       "MyModule": true
-     }
+       var summary = result.Value; // OrderSummaryDto
    }
    ```
+3. `Dispatcher` discovers and invokes `GetOrderSummaryHandler` inside the `Orders` module at runtime.
 
----
+### 2. Asynchronous Pub/Sub Events (via `IEventBus`)
+When `Orders` creates an order and `Notifications` needs to react:
+1. `Orders` publishes an event defined in `Orders.Contracts`:
+   ```csharp
+   await _eventBus.PublishAsync(new OrderPlacedEvent(order.Id, order.Total), ct);
+   ```
+2. `Notifications` implements `IEventHandler<OrderPlacedEvent>`:
+   ```csharp
+   public class SendOrderEmailHandler(ILogger<SendOrderEmailHandler> logger) : IEventHandler<OrderPlacedEvent>
+   {
+       public async Task HandleAsync(OrderPlacedEvent @event, CancellationToken ct = default)
+       {
+           logger.LogInformation("Order placed: {OrderId}", @event.Id);
+       }
+   }
+   ```
 
 ## System Role
 
@@ -549,9 +552,11 @@ Kernel/Host administrative operations that should only be accessible to system-l
 
 ### Project Dependencies
 ```
-Host → Kernel, Data
+Host → Kernel, Data, Modules (active)
 Data → Kernel
-Module → Kernel (and Data if using EF DbContexts)
+Module → Kernel, Module.Contracts (and Data if using EF DbContexts)
+Module.Contracts → Kernel
+ModuleA → ModuleB.Contracts (never ModuleB implementation)
 Kernel → (no project references, only NuGet packages)
 ```
 

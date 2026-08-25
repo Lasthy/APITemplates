@@ -16,6 +16,8 @@ if ([string]::IsNullOrWhiteSpace($Name)) {
 $solutionDir = $PSScriptRoot
 $moduleDir = "$solutionDir/Modules/$Name"
 $moduleCsproj = "$moduleDir/$Name.csproj"
+$contractsDir = "$solutionDir/Modules/$Name.Contracts"
+$contractsCsproj = "$contractsDir/$Name.Contracts.csproj"
 $hostCsproj = "$solutionDir/Host/Host.csproj"
 
 if (Test-Path $moduleCsproj) {
@@ -23,7 +25,7 @@ if (Test-Path $moduleCsproj) {
     exit 1
 }
 
-Write-Host "Creating module '$Name'..." -ForegroundColor Cyan
+Write-Host "Creating module '$Name' (with companion '$Name.Contracts')..." -ForegroundColor Cyan
 Push-Location $solutionDir
 try {
     dotnet new mwa-module -n $Name
@@ -36,14 +38,20 @@ try {
         $slnFile = Get-ChildItem -Path $solutionDir -Filter "*.sln" | Select-Object -First 1
     }
 
-    Write-Host "Adding '$Name' to solution under Modules folder..." -ForegroundColor Cyan
+    Write-Host "Adding '$Name' and '$Name.Contracts' to solution under Modules folder..." -ForegroundColor Cyan
     if ($slnFile) {
         dotnet sln $slnFile.FullName add $moduleCsproj -s "Modules"
+        if (Test-Path $contractsCsproj) {
+            dotnet sln $slnFile.FullName add $contractsCsproj -s "Modules"
+        }
     } else {
         dotnet sln add $moduleCsproj -s "Modules"
+        if (Test-Path $contractsCsproj) {
+            dotnet sln add $contractsCsproj -s "Modules"
+        }
     }
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to add '$moduleCsproj' to solution."
+        throw "Failed to add projects to solution."
     }
 
     if (Test-Path $hostCsproj) {
@@ -56,7 +64,7 @@ try {
         Write-Warning "Host project not found at '$hostCsproj'. Skipping reference addition."
     }
 
-    Write-Host "Module '$Name' created and configured successfully!" -ForegroundColor Green
+    Write-Host "Module '$Name' (and '$Name.Contracts') created and configured successfully!" -ForegroundColor Green
     Write-Host "Remember to enable '$Name' in Host/appsettings.Instance.json if required." -ForegroundColor Yellow
 }
 finally {

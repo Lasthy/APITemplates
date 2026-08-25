@@ -1,6 +1,6 @@
 # MyAPI — Agent Guide
 
-This repository is a **Modular Web API** (MWA) monolith in ASP.NET (.NET 10). It organizes features into decoupled, pluggable modules sharing a common Kernel and Data layer.
+This repository is a **Modular Web API** (MWA) monolith in ASP.NET (.NET 10). It organizes features into decoupled, pluggable modules sharing a common Kernel and Data layer, utilizing companion contract projects for cross-module communication.
 
 ---
 
@@ -33,7 +33,8 @@ Solution Root (MyAPI.slnx)
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
 ├── Modules/                 # Directory where module projects live
-│   └── {ModuleName}/        # Pluggable module project (e.g. Catalog, Orders)
+│   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints)
+│   └── {ModuleName}.Contracts/ # Companion public contracts (events, requests, DTOs)
 ├── create-module.ps1        # Helper script to scaffold, sln-add, and Host-reference a new module (PowerShell)
 ├── create-module.sh         # Helper script to scaffold, sln-add, and Host-reference a new module (Bash)
 ├── GlobalUsings.Shared.cs   # `global using DefaultId = System.Ulid;`
@@ -44,6 +45,7 @@ Solution Root (MyAPI.slnx)
 
 - **Kernel owns all cross-cutting concerns.** Modules depend on Kernel; Kernel never depends on modules.
 - **Modules are self-contained projects.** Each module has its own `appsettings.{ModuleName}.json` and implements `IModule` for DI and endpoint registration.
+- **Companion Contract Projects for Cross-Module Communication.** Modules expose public contracts (events, requests, DTOs) via a companion `{ModuleName}.Contracts` project. A module may reference another module's `.Contracts` project, but **never** its implementation project.
 - **Module activation is config-driven.** The `InstanceSettings` section in `appsettings.Instance.json` has an `ActiveModules` dictionary (`{ "ModuleName": true/false }`) controlling which modules are loaded at startup.
 - **`DefaultId` is `System.Ulid` everywhere.** Defined in `GlobalUsings.Shared.cs` and propagated to all projects via `Directory.Build.props`.
 
@@ -98,6 +100,62 @@ A shared class library for Entity Framework Core persistence implementations, da
 ### Kernel (`Kernel/`)
 
 A class library (not a web project) that provides all shared infrastructure. It targets `net10.0` and references `Microsoft.AspNetCore.App`, Entity Framework Core, and OpenAPI packages.
+
+---
+
+## Cross-Module Communication
+
+Cross-module communication follows the **Companion Contract Projects (`*.Contracts`)** pattern:
+
+```
+Modules/
+├── Orders/                                  # Module implementation
+│   ├── Features/
+│   │   └── GetOrderSummaryHandler.cs        # Implements IRequestHandler from Orders.Contracts
+│   ├── Orders.csproj                        # References Kernel & Orders.Contracts
+│   └── OrdersModule.cs
+│
+├── Orders.Contracts/                        # Public contracts (shareable)
+│   ├── Dtos/OrderSummaryDto.cs
+│   ├── Events/OrderPlacedEvent.cs           # Inherits Event
+│   ├── Requests/GetOrderSummary.cs          # Implements IRequest<OrderSummaryDto>
+│   └── Orders.Contracts.csproj              # References Kernel
+│
+└── Notifications/                           # Another module
+    ├── Features/
+    │   └── SendOrderEmailHandler.cs         # Implements IEventHandler<OrderPlacedEvent>
+    └── Notifications.csproj                 # References Kernel & Orders.Contracts
+```
+
+### 1. Synchronous Queries/Commands (via `IDispatcher`)
+When `Notifications` needs data from `Orders`:
+1. Reference `Orders.Contracts` in `Notifications.csproj`.
+2. Inject `IDispatcher` and send the request:
+   ```csharp
+   var result = await _dispatcher.DispatchAsync(new GetOrderSummary(orderId), ct);
+   if (result.IsSuccess)
+   {
+       var summary = result.Value; // OrderSummaryDto
+   }
+   ```
+3. `Dispatcher` discovers and invokes `GetOrderSummaryHandler` inside the `Orders` module at runtime.
+
+### 2. Asynchronous Pub/Sub Events (via `IEventBus`)
+When `Orders` creates an order and `Notifications` needs to react:
+1. `Orders` publishes an event defined in `Orders.Contracts`:
+   ```csharp
+   await _eventBus.PublishAsync(new OrderPlacedEvent(order.Id, order.Total), ct);
+   ```
+2. `Notifications` implements `IEventHandler<OrderPlacedEvent>`:
+   ```csharp
+   public class SendOrderEmailHandler(ILogger<SendOrderEmailHandler> logger) : IEventHandler<OrderPlacedEvent>
+   {
+       public async Task HandleAsync(OrderPlacedEvent @event, CancellationToken ct = default)
+       {
+           logger.LogInformation("Order placed: {OrderId}", @event.Id);
+       }
+   }
+   ```
 
 ---
 
@@ -211,7 +269,7 @@ or
 ./create-module.sh Orders
 ```
 
-This automatically scaffolds the module, adds it to the solution under the `Modules` folder, and references it in `Host/Host.csproj`.
+This automatically scaffolds both `Modules/Orders` and `Modules/Orders.Contracts`, adds both to the solution under the `Modules` folder, and references `Modules/Orders` in `Host/Host.csproj`.
 
 ---
 
@@ -219,6 +277,6 @@ This automatically scaffolds the module, adds it to the solution under the `Modu
 
 ### Naming & Structure
 - **Identifiers**: Always `DefaultId` (= `System.Ulid`). Never use `Guid`, `int`, or `string` for entity IDs.
-- **Features & Requests**: Place requests/commands/queries in `Features/`. Do **not** append `Request` to the class/record name; name them directly as verbs/actions (e.g., `GetOrders`, `CreateOrder`). The handler is named with a `Handler` suffix (e.g. `GetOrdersHandler`, `CreateOrderHandler`).
+- **Features & Requests**: Place requests/commands/queries in `Features/` (or `{ModuleName}.Contracts/Requests/` if shared). Do **not** append `Request` to the class/record name; name them directly as verbs/actions (e.g., `GetOrders`, `CreateOrder`). The handler is named with a `Handler` suffix (e.g. `GetOrdersHandler`, `CreateOrderHandler`).
 - **Endpoints & Routing**: All API endpoints must start with `api/<version>/` (e.g., `api/v1/orders`). Group endpoints using `.WithTags("{ModuleName}").WithGroupName("{ModuleName}")`.
-- **Dependencies**: Modules depend on `Kernel` (and `Data` if using EF). Modules should never depend on other modules directly — use domain events or Kernel messaging instead.
+- **Dependencies**: Modules depend on `Kernel` (and `Data` if using EF). Modules must never depend on other module implementations directly — reference the target module's companion `.Contracts` project and communicate via `IDispatcher` or `IEventBus`.
