@@ -68,4 +68,14 @@ public interface IUserService
         DefaultId sourceUserId,
         DefaultId createdBy,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Changes the password for the specified user after verifying the current password.
+    /// Also revokes all active refresh tokens for security.
+    /// </summary>
+    Task<Result> ChangePasswordAsync(
+        DefaultId userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken ct = default);
 }

@@ -20,7 +20,7 @@ Modules/
 │   │   ├── ApplicationRole.cs                    # IdentityRole<DefaultId>
 │   │   └── RefreshToken.cs                       # Refresh token entity with rotation
 │   ├── Features/
-│   │   ├── Auth/                                 # Login, RefreshToken, Logout, GetCurrentUser
+│   │   ├── Auth/                                 # Login, RefreshToken, Logout, GetCurrentUser, ChangePassword
 │   │   ├── Users/                                # CreateUser, GetUsers, GetUser, UpdateUser, Ban/Unban, Dummy, Preferences
 │   │   ├── Profiles/                             # GetProfiles, GetProfile
 │   │   ├── GetUserSummaryHandler.cs              # Cross-module handler for GetUserSummary
@@ -46,7 +46,7 @@ Modules/
 └── Identity.Contracts/                           # Companion contracts
     ├── Constants/                                # IdentityRoles, IdentityPolicies, IdentityProfiles, IdentityClaimTypes
     ├── Dtos/                                     # UserDto, UserDetailDto, AuthTokenDto, ProfileDto, ProfileDetailDto
-    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent
+    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent, PasswordChangedEvent
     ├── Requests/                                 # GetUserSummary, ValidateUserAccess
     └── Identity.Contracts.csproj
 ```
@@ -128,6 +128,7 @@ app.UseAuthorization();
 | `POST` | `/login` | Anonymous | Email + password → AuthTokenDto + cookie |
 | `POST` | `/refresh` | Anonymous | Refresh token → new AuthTokenDto + cookie |
 | `POST` | `/logout` | Authenticated | Revoke tokens, clear cookie |
+| `POST` | `/change-password` | Authenticated | Change current user password + revoke tokens |
 | `GET` | `/me` | Authenticated | Current user details |
 
 ### Users (`/api/v1/identity/users`)

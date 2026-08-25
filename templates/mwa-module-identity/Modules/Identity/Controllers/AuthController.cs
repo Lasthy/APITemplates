@@ -128,6 +128,31 @@ public class AuthController : ControllerBase
             failure => NotFound(new { message = failure.Message }));
     }
 
+    /// <summary>
+    /// Change password for the currently authenticated user.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordRequest body,
+        CancellationToken ct)
+    {
+        if (_scopeContext.UserId == null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _dispatcher.DispatchAsync(
+            new Features.Auth.ChangePassword(
+                _scopeContext.UserId.Value,
+                body.CurrentPassword,
+                body.NewPassword), ct);
+
+        return result.Match<IActionResult>(
+            _ => NoContent(),
+            failure => BadRequest(new { message = failure.Message }));
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void SetAccessTokenCookie(string accessToken, DateTime expiresAt)
@@ -153,3 +178,8 @@ public record LoginRequest(string Email, string Password);
 /// Refresh token request body.
 /// </summary>
 public record RefreshTokenRequest(string Token);
+
+/// <summary>
+/// Change password request body.
+/// </summary>
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);

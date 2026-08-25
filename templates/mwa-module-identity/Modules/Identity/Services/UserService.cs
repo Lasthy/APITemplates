@@ -315,6 +315,44 @@ public class UserService : IUserService
         return await GenerateTokensForUserAsync(dummyUser, ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<Result> ChangePasswordAsync(
+        DefaultId userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            return Result.Failure(new InvalidOperationException($"User '{userId}' not found."));
+        }
+
+        if (user.IsBanned)
+        {
+            return Result.Failure(new UnauthorizedAccessException("This account has been banned."));
+        }
+
+        if (user.IsDummy)
+        {
+            return Result.Failure(new InvalidOperationException("Cannot change password for dummy accounts."));
+        }
+
+        var changeResult = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!changeResult.Succeeded)
+        {
+            var errors = string.Join("; ", changeResult.Errors.Select(e => e.Description));
+            return Result.Failure(new InvalidOperationException($"Failed to change password: {errors}"));
+        }
+
+        // Revoke all active refresh tokens on password change for security
+        await RevokeAllRefreshTokensAsync(userId, ct);
+
+        _logger.LogInformation("Password changed successfully for user {UserId}", userId);
+
+        return Result.Success();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task<Result<AuthTokenDto>> GenerateTokensForUserAsync(
