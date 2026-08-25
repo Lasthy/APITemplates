@@ -1,0 +1,17 @@
+namespace Identity.Contracts.Constants;
+
+/// <summary>
+/// Well-known claim type constants used by the Identity module.
+/// </summary>
+public static class IdentityClaimTypes
+{
+    /// <summary>
+    /// Claim type for the user's profile name.
+    /// </summary>
+    public const string Profile = "profile";
+
+    /// <summary>
+    /// Claim type indicating whether the user is a dummy account.
+    /// </summary>
+    public const string IsDummy = "is_dummy";
+}

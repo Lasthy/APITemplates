@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Lasthy",
+  "classifications": [
+    "Web",
+    "Web API",
+    "API",
+    "Identity",
+    "Project"
+  ],
+  "identity": "Lasthy.ModularAPI.Module.Identity",
+  "name": "Modular API Identity Module",
+  "shortName": "mwa-module-identity",
+  "defaultName": "Identity",
+  "preferNameDirectory": false,
+  "sourceName": "Identity",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}
