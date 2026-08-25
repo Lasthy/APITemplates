@@ -78,4 +78,22 @@ public interface IUserService
         string currentPassword,
         string newPassword,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates a password reset token for the user with the given email.
+    /// Returns the user entity and the generated token string, or null if the user is not found or banned.
+    /// </summary>
+    Task<Result<(ApplicationUser User, string Token)?>> GeneratePasswordResetTokenAsync(
+        string email,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Resets a user's password using the provided reset token.
+    /// Also revokes all active refresh tokens for security.
+    /// </summary>
+    Task<Result<ApplicationUser>> ResetPasswordAsync(
+        string email,
+        string token,
+        string newPassword,
+        CancellationToken ct = default);
 }

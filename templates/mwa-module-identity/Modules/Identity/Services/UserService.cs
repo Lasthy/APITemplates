@@ -353,6 +353,53 @@ public class UserService : IUserService
         return Result.Success();
     }
 
+    /// <inheritdoc/>
+    public async Task<Result<(ApplicationUser User, string Token)?>> GeneratePasswordResetTokenAsync(
+        string email,
+        CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null || user.IsBanned || user.IsDummy)
+        {
+            return Result.Success<(ApplicationUser User, string Token)?>(null);
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        _logger.LogInformation("Generated password reset token for user {UserId}", user.Id);
+
+        return Result.Success<(ApplicationUser User, string Token)?>((user, token));
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<ApplicationUser>> ResetPasswordAsync(
+        string email,
+        string token,
+        string newPassword,
+        CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null || user.IsBanned || user.IsDummy)
+        {
+            return Result.Failure<ApplicationUser>(
+                new InvalidOperationException("Invalid password reset request."));
+        }
+
+        var resetResult = await _userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!resetResult.Succeeded)
+        {
+            var errors = string.Join("; ", resetResult.Errors.Select(e => e.Description));
+            return Result.Failure<ApplicationUser>(
+                new InvalidOperationException($"Failed to reset password: {errors}"));
+        }
+
+        // Revoke all active refresh tokens on password reset for security
+        await RevokeAllRefreshTokensAsync(user.Id, ct);
+
+        _logger.LogInformation("Password reset successfully for user {UserId}", user.Id);
+
+        return Result.Success(user);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task<Result<AuthTokenDto>> GenerateTokensForUserAsync(

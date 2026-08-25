@@ -153,6 +153,41 @@ public class AuthController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    /// <summary>
+    /// Initiate a password reset by sending a reset token event for the specified email.
+    /// Always returns 200 OK to prevent email enumeration.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest body,
+        CancellationToken ct)
+    {
+        var result = await _dispatcher.DispatchAsync(
+            new Features.Auth.ForgotPassword(body.Email), ct);
+
+        return result.Match<IActionResult>(
+            _ => Ok(new { message = "If the email is registered, a password reset link has been sent." }),
+            failure => BadRequest(new { message = failure.Message }));
+    }
+
+    /// <summary>
+    /// Reset password using a valid reset token.
+    /// </summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest body,
+        CancellationToken ct)
+    {
+        var result = await _dispatcher.DispatchAsync(
+            new Features.Auth.ResetPassword(body.Email, body.Token, body.NewPassword), ct);
+
+        return result.Match<IActionResult>(
+            _ => Ok(new { message = "Password reset successfully. You can now log in with your new password." }),
+            failure => BadRequest(new { message = failure.Message }));
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void SetAccessTokenCookie(string accessToken, DateTime expiresAt)
@@ -183,3 +218,13 @@ public record RefreshTokenRequest(string Token);
 /// Change password request body.
 /// </summary>
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+/// <summary>
+/// Forgot password request body.
+/// </summary>
+public record ForgotPasswordRequest(string Email);
+
+/// <summary>
+/// Reset password request body.
+/// </summary>
+public record ResetPasswordRequest(string Email, string Token, string NewPassword);

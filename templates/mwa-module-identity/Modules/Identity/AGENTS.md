@@ -20,7 +20,7 @@ Modules/
 │   │   ├── ApplicationRole.cs                    # IdentityRole<DefaultId>
 │   │   └── RefreshToken.cs                       # Refresh token entity with rotation
 │   ├── Features/
-│   │   ├── Auth/                                 # Login, RefreshToken, Logout, GetCurrentUser, ChangePassword
+│   │   ├── Auth/                                 # Login, RefreshToken, Logout, GetCurrentUser, ChangePassword, ForgotPassword, ResetPassword
 │   │   ├── Users/                                # CreateUser, GetUsers, GetUser, UpdateUser, Ban/Unban, Dummy, Preferences
 │   │   ├── Profiles/                             # GetProfiles, GetProfile
 │   │   ├── GetUserSummaryHandler.cs              # Cross-module handler for GetUserSummary
@@ -46,7 +46,7 @@ Modules/
 └── Identity.Contracts/                           # Companion contracts
     ├── Constants/                                # IdentityRoles, IdentityPolicies, IdentityProfiles, IdentityClaimTypes
     ├── Dtos/                                     # UserDto, UserDetailDto, AuthTokenDto, ProfileDto, ProfileDetailDto
-    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent, PasswordChangedEvent
+    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent, PasswordChangedEvent, PasswordResetRequestedEvent, PasswordResetCompletedEvent
     ├── Requests/                                 # GetUserSummary, ValidateUserAccess
     └── Identity.Contracts.csproj
 ```
@@ -129,6 +129,8 @@ app.UseAuthorization();
 | `POST` | `/refresh` | Anonymous | Refresh token → new AuthTokenDto + cookie |
 | `POST` | `/logout` | Authenticated | Revoke tokens, clear cookie |
 | `POST` | `/change-password` | Authenticated | Change current user password + revoke tokens |
+| `POST` | `/forgot-password` | Anonymous | Initiate password reset → reset token event |
+| `POST` | `/reset-password` | Anonymous | Token + new password → reset password |
 | `GET` | `/me` | Authenticated | Current user details |
 
 ### Users (`/api/v1/identity/users`)
