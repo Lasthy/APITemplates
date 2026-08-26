@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Catalog.Contracts.Dtos;
 using Cysharp.Serialization.Json;
+using Identity.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Orders.Contracts.Dtos;
 
 namespace Shopping.Tests;
@@ -77,9 +80,28 @@ public class ShoppingFlowTests : IClassFixture<ShoppingApiTestFactory>
         var employeeToken = await _factory.LoginAsync(anonymousClient, "employee@shopping.local", "Password123!");
         var employeeClient = _factory.CreateAuthenticatedClient(employeeToken);
 
-        // 1.8 Client logs in
+        // 1.8 Client logs in & verifies clientId claim
         var clientToken = await _factory.LoginAsync(anonymousClient, "client@shopping.local", "Password123!");
         var clientClient = _factory.CreateAuthenticatedClient(clientToken);
+
+        var meResp = await clientClient.GetAsync("/api/v1/identity/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meResp.StatusCode);
+        var meJson = await meResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var claimsJson = meJson.GetProperty("claims");
+        Assert.True(claimsJson.TryGetProperty("clientId", out var clientIdProp), "Expected 'clientId' claim on Client user");
+        var clientIdStr = clientIdProp.GetString();
+        Assert.False(string.IsNullOrWhiteSpace(clientIdStr));
+
+        // Verify Client entity exists in IdentityModuleDbContext
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var identityDb = scope.ServiceProvider.GetRequiredService<IdentityModuleDbContext>();
+            var clientEntity = await identityDb.Clients.FirstOrDefaultAsync(c => c.Email == "client@shopping.local");
+            Assert.NotNull(clientEntity);
+            Assert.Equal(clientIdStr, clientEntity.Id.ToString());
+            Assert.Equal("client1", clientEntity.Name);
+            Assert.Equal("client@shopping.local", clientEntity.Email);
+        }
 
         // 1.9 Manager cannot create another Manager (Only System can create managers)
         var managerCreateManagerResp = await managerClient.PostAsJsonAsync("/api/v1/identity/users/managers", new

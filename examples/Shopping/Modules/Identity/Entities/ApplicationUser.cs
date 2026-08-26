@@ -48,6 +48,11 @@ public class ApplicationUser : IdentityUser<DefaultId>, IAuditable
     /// </summary>
     public bool IsDummy { get; set; }
 
+    /// <summary>
+    /// Optional navigation property to companion Client entity.
+    /// </summary>
+    public Client? Client { get; set; }
+
     // ── IAuditable ────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>

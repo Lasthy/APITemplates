@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj": {}
+    "D:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj": {}
   },
   "projects": {
-    "d:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj": {
+    "D:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj",
+        "projectUniqueName": "D:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj",
         "projectName": "Identity.Contracts",
-        "projectPath": "d:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj",
+        "projectPath": "D:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\Identity.Contracts.csproj",
         "packagesPath": "C:\\Users\\Lasthy\\.nuget\\packages\\",
-        "outputPath": "d:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\obj\\",
+        "outputPath": "D:\\Dev\\APITemplates\\templates\\mwa-module-identity\\Modules\\Identity.Contracts\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

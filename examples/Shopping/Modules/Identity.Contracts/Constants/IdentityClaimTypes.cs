@@ -14,4 +14,9 @@ public static class IdentityClaimTypes
     /// Claim type indicating whether the user is a dummy account.
     /// </summary>
     public const string IsDummy = "is_dummy";
+
+    /// <summary>
+    /// Claim type for the associated client ID.
+    /// </summary>
+    public const string ClientId = "clientId";
 }

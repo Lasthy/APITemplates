@@ -22,6 +22,11 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
     /// </summary>
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
+    /// <summary>
+    /// Clients associated with client profile users.
+    /// </summary>
+    public DbSet<Client> Clients { get; set; } = null!;
+
     public IdentityModuleDbContext(DbContextOptions<IdentityModuleDbContext> options)
         : base(options) { }
 
@@ -100,6 +105,27 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Client configuration
+        builder.Entity<Client>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasMaxLength(26);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(26);
+
+            entity.HasIndex(e => e.UserId).IsUnique();
+
+            entity.HasOne(e => e.User)
+                .WithOne(u => u.Client)
+                .HasForeignKey<Client>(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

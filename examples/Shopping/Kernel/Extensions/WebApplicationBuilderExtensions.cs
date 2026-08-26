@@ -228,27 +228,52 @@ public static class WebApplicationBuilderExtensions
             {
                 if (scope.ServiceProvider.GetService(contextType) is DbContext dbContext)
                 {
-                    var creator = dbContext.Database.GetService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>()
-                        as Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator;
-
-                    if (creator != null)
+                    if (dbContext.Database.IsRelational())
                     {
-                        if (!creator.Exists())
+                        var allMigrations = dbContext.Database.GetMigrations().ToList();
+                        if (allMigrations.Count > 0)
                         {
-                            creator.Create();
-                            logger?.LogInformation("Created database for {ContextType}", contextType.Name);
-                        }
-
-                        if (!ContextTablesExist(dbContext))
-                        {
-                            try
+                            var pendingMigrations = dbContext.Database.GetPendingMigrations().ToList();
+                            dbContext.Database.Migrate();
+                            if (pendingMigrations.Count > 0)
                             {
-                                creator.CreateTables();
-                                logger?.LogInformation("Created tables for {ContextType}", contextType.Name);
+                                logger?.LogInformation("Applied {Count} pending migration(s) for {ContextType}: {Migrations}",
+                                    pendingMigrations.Count, contextType.Name, string.Join(", ", pendingMigrations));
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                logger?.LogWarning(ex, "Could not create tables for {ContextType}", contextType.Name);
+                                logger?.LogDebug("No pending migrations for {ContextType}", contextType.Name);
+                            }
+                        }
+                        else
+                        {
+                            var creator = dbContext.Database.GetService<Microsoft.EntityFrameworkCore.Storage.IDatabaseCreator>()
+                                as Microsoft.EntityFrameworkCore.Storage.RelationalDatabaseCreator;
+
+                            if (creator != null)
+                            {
+                                if (!creator.Exists())
+                                {
+                                    creator.Create();
+                                    logger?.LogInformation("Created database for {ContextType}", contextType.Name);
+                                }
+
+                                if (!ContextTablesExist(dbContext))
+                                {
+                                    try
+                                    {
+                                        creator.CreateTables();
+                                        logger?.LogInformation("Created tables for {ContextType}", contextType.Name);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        logger?.LogWarning(ex, "Could not create tables for {ContextType}", contextType.Name);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                dbContext.Database.EnsureCreated();
                             }
                         }
                     }
