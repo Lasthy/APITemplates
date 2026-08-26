@@ -11,7 +11,7 @@ namespace Kernel.Boxing;
 public class MessageWriter(
 	IJsonSerializer _jsonSerializer,
 	IPartitionManager _partitionManager,
-	IKernelDbContext _db
+	KernelDbContext _db
 ) : IMessageWriter
 {
 	/// <inheritdoc/>

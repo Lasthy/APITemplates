@@ -79,6 +79,26 @@ public static class WebApplicationBuilderExtension
             var method = addModuleMethod.MakeGenericMethod(moduleType);
             method.Invoke(null, [builder]);
         }
+
+        // Register all DbContext types found in service descriptors into DbContextTypeRegistry if present
+        var dbContextRegistry = builder.Services
+            .Where(d => d.ServiceType == typeof(Kernel.Persistence.DbContextTypeRegistry))
+            .Select(d => d.ImplementationInstance as Kernel.Persistence.DbContextTypeRegistry)
+            .FirstOrDefault();
+
+        if (dbContextRegistry != null)
+        {
+            var dbContextTypes = builder.Services
+                .Where(sd => typeof(Microsoft.EntityFrameworkCore.DbContext).IsAssignableFrom(sd.ServiceType) &&
+                             sd.ServiceType != typeof(Microsoft.EntityFrameworkCore.DbContext))
+                .Select(sd => sd.ServiceType)
+                .Distinct();
+
+            foreach (var type in dbContextTypes)
+            {
+                dbContextRegistry.Register(type);
+            }
+        }
     }
 
     /// <summary>
@@ -126,7 +146,11 @@ public static class WebApplicationBuilderExtension
         T.Register(builder.Services, builder.Configuration);
 
         // Register a named OpenAPI document for this module.
-        builder.Services.AddOpenApi(T.Name);
+        builder.Services.AddOpenApi(T.Name, options =>
+        {
+            options.ShouldInclude = description =>
+                string.Equals(description.GroupName, T.Name, StringComparison.OrdinalIgnoreCase);
+        });
 
         // Register all IEventHandler<> implementations from the module's assembly.
         RegisterEventHandlers(builder.Services, typeof(T).Assembly);

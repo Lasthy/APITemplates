@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kernel\Kernel.csproj" />
-    <ProjectReference Include="..\Data\Data.csproj" />
   </ItemGroup>
 
 </Project>

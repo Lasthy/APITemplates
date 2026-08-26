@@ -1,4 +1,3 @@
-using Data.Extensions;
 using Host.Extensions;
 using Kernel.Extensions;
 using Kernel.Modules;
@@ -18,6 +17,9 @@ var app = builder.Build();
 
 // Map the kernel OpenAPI JSON endpoint at /openapi/kernel.json.
 app.UseKernel();
+
+// Ensure databases and tables are created automatically on startup
+app.UseData();
 
 // Map module endpoints, wire up per-module OpenAPI documents + event types.
 app.UseModules();

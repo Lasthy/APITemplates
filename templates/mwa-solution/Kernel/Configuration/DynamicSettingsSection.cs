@@ -105,11 +105,11 @@ public abstract class DynamicSettingsSection
 	/// </summary>
 	public void Initialize()
 	{
+		var effectiveSection = SectionName;
+		Source = ResolveFilePath(Source, effectiveSection);
 		_baseOptions = LoadFile(Source);
 		_envOptions = [];
 		_envVarOptions = [];
-
-		var effectiveSection = SectionName;
 
 		// 1. Load environment JSON overlay if specified
 		if (!string.IsNullOrEmpty(EnvironmentName))
@@ -120,6 +120,7 @@ public abstract class DynamicSettingsSection
 				: $"appsettings.{effectiveSection}.{EnvironmentName}.json";
 
 			var envFilePath = string.IsNullOrEmpty(dir) ? envFileName : Path.Combine(dir, envFileName);
+			envFilePath = ResolveFilePath(envFilePath, effectiveSection);
 
 			if (File.Exists(envFilePath))
 			{
@@ -190,7 +191,8 @@ public abstract class DynamicSettingsSection
 	{
 		if (!HasPendingChanges) return;
 
-		File.WriteAllText(Source, JsonSerializer.Serialize(_baseOptions));
+		var targetPath = ResolveFilePath(Source, SectionName);
+		File.WriteAllText(targetPath, JsonSerializer.Serialize(_baseOptions));
 		HasPendingChanges = false;
 	}
 
@@ -199,14 +201,51 @@ public abstract class DynamicSettingsSection
 	/// </summary>
 	public string GetAsJson() => JsonSerializer.Serialize(_merged);
 
+	/// <summary>
+	/// Resolves a file path across the current working directory, AppContext.BaseDirectory, and module directories.
+	/// </summary>
+	public static string ResolveFilePath(string path, string? sectionName = null)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+			return path;
+
+		if (Path.IsPathRooted(path) && File.Exists(path))
+			return path;
+
+		// 1. Check relative to current working directory
+		var cwdPath = Path.Combine(Directory.GetCurrentDirectory(), path);
+		if (File.Exists(cwdPath))
+			return cwdPath;
+
+		// 2. Check relative to AppContext.BaseDirectory (build output / bin folder)
+		var baseDirPath = Path.Combine(AppContext.BaseDirectory, path);
+		if (File.Exists(baseDirPath))
+			return baseDirPath;
+
+		// 3. If a section name is available, check relative to module source folders
+		if (!string.IsNullOrEmpty(sectionName))
+		{
+			var modulePath1 = Path.Combine(Directory.GetCurrentDirectory(), "Modules", sectionName, path);
+			if (File.Exists(modulePath1))
+				return modulePath1;
+
+			var modulePath2 = Path.Combine(Directory.GetCurrentDirectory(), "..", "Modules", sectionName, path);
+			if (File.Exists(modulePath2))
+				return modulePath2;
+		}
+
+		return path;
+	}
+
 	// ── Private helpers ───────────────────────────────────────────────────
 
 	private Dictionary<string, JsonElement> LoadFile(string path)
 	{
-		if (!File.Exists(path))
+		var resolvedPath = ResolveFilePath(path, SectionName);
+		if (!File.Exists(resolvedPath))
 			return new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
 
-		var content = File.ReadAllText(path);
+		var content = File.ReadAllText(resolvedPath);
 		if (string.IsNullOrWhiteSpace(content))
 			return new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
 

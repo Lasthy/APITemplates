@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kernel/Kernel.csproj" />
+    <ProjectReference Include="../Catalog.Contracts/Catalog.Contracts.csproj" />
+    <ProjectReference Include="../Identity.Contracts/Identity.Contracts.csproj" />
+  </ItemGroup>
+
+  <!-- Include settings files in the build output so the Host can load them at runtime. -->
+  <ItemGroup>
+    <Content Include="appsettings.*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

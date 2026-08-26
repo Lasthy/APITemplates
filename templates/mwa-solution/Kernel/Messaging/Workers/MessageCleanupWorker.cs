@@ -21,7 +21,7 @@ public class MessageCleanupWorker(
         // Dynamic interval update if changed via DynamicSettings
         Interval = TimeSpan.FromHours(messagingSettings.CleanupIntervalHours);
 
-        var db = services.GetRequiredService<IKernelDbContext>();
+        var db = services.GetRequiredService<KernelDbContext>();
         var cutoff = DateTime.UtcNow.AddDays(-messagingSettings.CleanupRetentionDays);
 
         logger.LogDebug(

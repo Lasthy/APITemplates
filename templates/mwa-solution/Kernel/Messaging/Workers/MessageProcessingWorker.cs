@@ -23,7 +23,7 @@ public class MessageProcessingWorker(
         // Dynamic interval update if changed via DynamicSettings
         Interval = TimeSpan.FromSeconds(messagingSettings.ProcessingIntervalSeconds);
 
-        var db = services.GetRequiredService<IKernelDbContext>();
+        var db = services.GetRequiredService<KernelDbContext>();
         var dispatcher = services.GetRequiredService<IMessageDispatcher>();
         var instanceSettings = services.GetRequiredService<InstanceSettings>();
 

@@ -1,10 +1,12 @@
-using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Persistence.Extensions;
 
+/// <summary>
+/// Extension methods for configuring <see cref="DbContextOptionsBuilder"/> with database providers and interceptors.
+/// </summary>
 public static class DbContextOptionsBuilderExtensions
 {
     /// <summary>
@@ -23,128 +25,75 @@ public static class DbContextOptionsBuilderExtensions
     }
 
     /// <summary>
-    /// Configures the DbContext to use the specified database provider using reflection.
-    /// The consuming project must have the appropriate Entity Framework Core provider NuGet package installed.
+    /// Configures the DbContext to use the specified database provider with optional schema-aware migrations history isolation.
+    /// Supported providers: Sqlite, SqlServer, PostgreSQL (or Postgres / Npgsql), MySql (or MariaDb), InMemory.
     /// </summary>
     /// <param name="builder">The options builder.</param>
-    /// <param name="provider">The provider name (e.g., Sqlite, SqlServer, PostgreSQL, MySql).</param>
-    /// <param name="connectionString">The connection string.</param>
+    /// <param name="provider">The provider name (e.g., Sqlite, SqlServer, PostgreSQL, MySql, InMemory).</param>
+    /// <param name="connectionString">The connection string or database name.</param>
+    /// <param name="schema">Optional schema name to isolate migrations history across modules.</param>
     /// <returns>The options builder so that further configuration can be chained.</returns>
     public static DbContextOptionsBuilder UseConfiguredDatabase(
         this DbContextOptionsBuilder builder,
         string provider,
-        string connectionString)
+        string connectionString,
+        string? schema = null)
     {
-        return provider.ToLowerInvariant() switch
+        var normalizedProvider = provider?.Trim().ToLowerInvariant() ?? "sqlite";
+
+        return normalizedProvider switch
         {
-            "sqlite" => InvokeExtensionMethod(
-                builder,
-                "Microsoft.EntityFrameworkCore.Sqlite",
-                "Microsoft.EntityFrameworkCore.SqliteDbContextOptionsBuilderExtensions",
-                "UseSqlite",
-                connectionString),
-            "sqlserver" => InvokeExtensionMethod(
-                builder,
-                "Microsoft.EntityFrameworkCore.SqlServer",
-                "Microsoft.EntityFrameworkCore.SqlServerDbContextOptionsExtensions",
-                "UseSqlServer",
-                connectionString),
-            "postgresql" or "postgres" => InvokeExtensionMethod(
-                builder,
-                "Npgsql.EntityFrameworkCore.PostgreSQL",
-                "Microsoft.EntityFrameworkCore.NpgsqlDbContextOptionsExtensions",
-                "UseNpgsql",
-                connectionString),
-            "mysql" or "mariadb" => InvokeExtensionMethod(
-                builder,
-                "Pomelo.EntityFrameworkCore.MySql",
-                "Microsoft.EntityFrameworkCore.MySqlDbContextOptionsExtensions",
-                "UseMySql",
+            "sqlite" => builder.UseSqlite(connectionString, x =>
+            {
+                if (!string.IsNullOrWhiteSpace(schema))
+                {
+                    x.MigrationsHistoryTable($"__EFMigrationsHistory_{schema.ToLowerInvariant()}");
+                }
+            }),
+
+            "sqlserver" => builder.UseSqlServer(connectionString, x =>
+            {
+                if (!string.IsNullOrWhiteSpace(schema))
+                {
+                    x.MigrationsHistoryTable("__EFMigrationsHistory", schema.ToLowerInvariant());
+                }
+            }),
+
+            "postgresql" or "postgres" or "npgsql" => builder.UseNpgsql(connectionString, x =>
+            {
+                if (!string.IsNullOrWhiteSpace(schema))
+                {
+                    x.MigrationsHistoryTable("__EFMigrationsHistory", schema.ToLowerInvariant());
+                }
+            }),
+
+            "mysql" or "mariadb" => builder.UseMySql(
                 connectionString,
-                // Pomelo MySql requires a ServerVersion parameter. We use AutoDetect.
-                requiresServerVersion: true),
-            "inmemory" => InvokeExtensionMethod(
-                builder,
-                "Microsoft.EntityFrameworkCore.InMemory",
-                "Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions",
-                "UseInMemoryDatabase",
-                connectionString),
-            _ => throw new InvalidOperationException($"Unsupported database provider: {provider}")
+                GetMySqlServerVersion(connectionString),
+                x =>
+                {
+                    if (!string.IsNullOrWhiteSpace(schema))
+                    {
+                        x.MigrationsHistoryTable($"__EFMigrationsHistory_{schema.ToLowerInvariant()}");
+                    }
+                }),
+
+            "inmemory" => builder.UseInMemoryDatabase(connectionString),
+
+            _ => throw new InvalidOperationException($"Unsupported database provider: '{provider}'. Supported providers are: SqlServer, PostgreSQL, MySql, Sqlite, InMemory.")
         };
     }
 
-    private static DbContextOptionsBuilder InvokeExtensionMethod(
-        DbContextOptionsBuilder builder,
-        string assemblyName,
-        string typeName,
-        string methodName,
-        string connectionString,
-        bool requiresServerVersion = false)
+    private static ServerVersion GetMySqlServerVersion(string connectionString)
     {
-        Assembly assembly;
         try
         {
-            assembly = Assembly.Load(assemblyName);
+            return ServerVersion.AutoDetect(connectionString);
         }
-        catch (FileNotFoundException)
+        catch
         {
-            throw new InvalidOperationException($"Could not load assembly '{assemblyName}'. Ensure the corresponding Entity Framework Core provider NuGet package is installed.");
-        }
-
-        var type = assembly.GetType(typeName);
-        if (type == null)
-        {
-            throw new InvalidOperationException($"Could not find type '{typeName}' in assembly '{assemblyName}'.");
-        }
-
-        if (requiresServerVersion && methodName == "UseMySql")
-        {
-            // Pomelo.EntityFrameworkCore.MySql: UseMySql(DbContextOptionsBuilder, string, ServerVersion, Action<MySqlDbContextOptionsBuilder>)
-            var serverVersionType = assembly.GetType("Microsoft.EntityFrameworkCore.ServerVersion");
-            if (serverVersionType == null) throw new InvalidOperationException("Could not find ServerVersion type for Pomelo MySql.");
-
-            var autoDetectMethod = serverVersionType.GetMethod("AutoDetect", new[] { typeof(string) });
-            if (autoDetectMethod == null) throw new InvalidOperationException("Could not find ServerVersion.AutoDetect method.");
-
-            var serverVersion = autoDetectMethod.Invoke(null, new object[] { connectionString });
-
-            var method = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                .FirstOrDefault(m => m.Name == methodName &&
-                                     m.GetParameters().Length >= 3 &&
-                                     m.GetParameters()[0].ParameterType == typeof(DbContextOptionsBuilder) &&
-                                     m.GetParameters()[1].ParameterType == typeof(string) &&
-                                     m.GetParameters()[2].ParameterType == serverVersionType);
-
-            if (method == null) throw new InvalidOperationException($"Could not find suitable {methodName} method for MySql.");
-
-            var parameters = new object[method.GetParameters().Length];
-            parameters[0] = builder;
-            parameters[1] = connectionString;
-            parameters[2] = serverVersion!;
-            // Leave remaining parameters (like action options) as default/null
-            
-            return (DbContextOptionsBuilder)method.Invoke(null, parameters)!;
-        }
-        else
-        {
-            // Standard providers: Use*(DbContextOptionsBuilder, string, Action<*DbContextOptionsBuilder>)
-            var method = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                .FirstOrDefault(m => m.Name == methodName &&
-                                     m.GetParameters().Length >= 2 &&
-                                     m.GetParameters()[0].ParameterType == typeof(DbContextOptionsBuilder) &&
-                                     m.GetParameters()[1].ParameterType == typeof(string));
-
-            if (method == null)
-            {
-                throw new InvalidOperationException($"Could not find suitable '{methodName}' method in '{typeName}'.");
-            }
-
-            var parameters = new object[method.GetParameters().Length];
-            parameters[0] = builder;
-            parameters[1] = connectionString;
-            // Leave remaining parameters (like action options) as default/null
-
-            return (DbContextOptionsBuilder)method.Invoke(null, parameters)!;
+            // Fallback for offline or design-time scenarios where connection cannot be opened
+            return new MySqlServerVersion(new Version(8, 0, 36));
         }
     }
 }

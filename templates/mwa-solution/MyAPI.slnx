@@ -1,5 +1,4 @@
 <Solution>
-  <Project Path="Data/Data.csproj" />
   <Project Path="Host/Host.csproj" />
   <Project Path="Kernel/Kernel.csproj" />
 </Solution>

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Modules/">
+    <Project Path="Modules/Catalog.Contracts/Catalog.Contracts.csproj" />
+    <Project Path="Modules/Catalog/Catalog.csproj" />
+    <Project Path="Modules/Identity.Contracts/Identity.Contracts.csproj" />
+    <Project Path="Modules/Identity/Identity.csproj" />
+    <Project Path="Modules/Orders.Contracts/Orders.Contracts.csproj" />
+    <Project Path="Modules/Orders/Orders.csproj" />
+  </Folder>
+  <Project Path="Host/Host.csproj" />
+  <Project Path="Kernel/Kernel.csproj" />
+  <Project Path="Tests/Shopping.Tests.csproj" />
+</Solution>

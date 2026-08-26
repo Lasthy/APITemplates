@@ -10,30 +10,26 @@ This repository is a **Modular Web API** (MWA) monolith in ASP.NET (.NET 10). It
 Solution Root (MyAPI.slnx)
 ├── Host/                    # ASP.NET Web App — entry point, pipeline, static appsettings
 │   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
-├── Data/                    # Shared EF Core database infrastructure & contexts
-│   ├── Configuration/       # DataSettings (dynamic settings for Database: Provider, ConnectionString)
-│   ├── Extensions/          # WebApplicationBuilder extension (AddData)
-│   └── Persistence/         # KernelDbContext (implements IKernelDbContext)
-├── Kernel/                  # Shared class library — all cross-cutting concerns
+├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
 │   ├── Common/              # Result pattern (Result, Result<T>, PagedResult<T>)
-│   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings)
+│   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (IScopeContext, WebScopeContext)
 │   ├── Entities/            # Entity marker interfaces (IAuditable, ISoftDeletable, IHasDomainEvents)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
-│   ├── Extensions/          # WebApplicationBuilder extension (AddKernel, UseKernel)
-│   ├── Health/              # Health check models
+│   ├── Extensions/          # WebApplicationBuilder extensions (AddKernel, AddData, UseKernel, UseData)
+│   ├── Health/              # Health check models + checks (MemoryHealthCheck, DatabaseHealthCheck)
 │   ├── Json/                # Centralized JSON serializer abstraction (IJsonSerializer)
 │   ├── Messaging/           # Outbox/Inbox message persistence + processing (Kernel.Boxing)
 │   ├── Modules/             # IModule contract + module registration infrastructure
 │   ├── Partitioning/        # Partition management for multi-instance deployments
-│   ├── Persistence/         # IDbContext, IKernelDbContext + EF SaveChanges interceptors
+│   ├── Persistence/         # IDbContext, IDbContextSchema, KernelDbContext, DbContextTypeRegistry + EF SaveChanges interceptors
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
 ├── Modules/                 # Directory where module projects live
-│   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints)
+│   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
 │   └── {ModuleName}.Contracts/ # Companion public contracts (events, requests, DTOs)
 ├── create-module.ps1        # Helper script to scaffold, sln-add, and Host-reference a new module (PowerShell)
 ├── create-module.sh         # Helper script to scaffold, sln-add, and Host-reference a new module (Bash)
@@ -43,8 +39,8 @@ Solution Root (MyAPI.slnx)
 
 ### Key Design Principles
 
-- **Kernel owns all cross-cutting concerns.** Modules depend on Kernel; Kernel never depends on modules.
-- **Modules are self-contained projects.** Each module has its own `appsettings.{ModuleName}.json` and implements `IModule` for DI and endpoint registration.
+- **Kernel owns all cross-cutting concerns and persistence infrastructure.** Modules depend on Kernel; Kernel never depends on modules.
+- **Modules are self-contained projects.** Each module has its own `appsettings.{ModuleName}.json`, its own EF Core `DbContext` (with schema isolation), and implements `IModule` for DI and endpoint registration.
 - **Companion Contract Projects for Cross-Module Communication.** Modules expose public contracts (events, requests, DTOs) via a companion `{ModuleName}.Contracts` project. A module may reference another module's `.Contracts` project, but **never** its implementation project.
 - **Module activation is config-driven.** The `InstanceSettings` section in `appsettings.Instance.json` has an `ActiveModules` dictionary (`{ "ModuleName": true/false }`) controlling which modules are loaded at startup.
 - **`DefaultId` is `System.Ulid` everywhere.** Defined in `GlobalUsings.Shared.cs` and propagated to all projects via `Directory.Build.props`.
@@ -59,8 +55,8 @@ The executable ASP.NET web application. This is the composition root.
 
 | File | Purpose |
 |---|---|
-| `Program.cs` | Calls `builder.AddKernel()`, `builder.AddData()`, `builder.AddModules()`, `app.UseKernel()`, `app.UseModules()`, and mounts the OpenAPI viewer UI. |
-| `Host.csproj` | Web SDK project, references Kernel and Data. Includes `Scalar.AspNetCore` and `Swashbuckle.AspNetCore`. |
+| `Program.cs` | Calls `builder.AddKernel()`, `builder.AddData()`, `builder.AddModules()`, `app.UseKernel()`, `app.UseData()`, `app.UseModules()`, and mounts the OpenAPI viewer UI. |
+| `Host.csproj` | Web SDK project, references Kernel. Includes `Scalar.AspNetCore` and `Swashbuckle.AspNetCore`. |
 | `appsettings.json` | Root dynamic settings — logging, allowed hosts (backed by `HostSettings`, feeds into `IConfiguration`). |
 | `appsettings.{Environment}.json` | Environment-specific overrides for root dynamic settings (logging levels, etc.). |
 | `appsettings.Application.json` | Dynamic settings for the application: `Environment`, `PartitionAmount`. |
@@ -77,6 +73,7 @@ builder.AddData();        // Register database options and DbContexts
 builder.AddModules();     // Discover + register active modules
 var app = builder.Build();
 app.UseKernel();          // Map /openapi/kernel.json
+app.UseData();            // Ensure databases and tables are created automatically on startup
 app.UseModules();         // Map module endpoints + /openapi/{module}.json + event types
 // Mount Scalar or Swagger UI (reads OpenApiViewer from appsettings.Instance.json)
 ```
@@ -89,17 +86,9 @@ app.UseModules();         // Map module endpoints + /openapi/{module}.json + eve
 - Each **module has its own `appsettings.{ModuleName}.json`** with optional `appsettings.{ModuleName}.{Environment}.json` overlays for module-specific configuration.
 - **All Dynamic Settings sections** automatically integrate into `builder.Configuration` (`IConfiguration`) and reload on changes.
 
-### Data (`Data/`)
-
-A shared class library for Entity Framework Core persistence implementations, database provider registration, and shared DbContext infrastructure.
-
-- **`KernelDbContext`** — Concrete EF Core DbContext implementing `IKernelDbContext` (owns `DbSet<Message> Messages`).
-- **`DataSettings`** — Dynamic settings for database provider and connection string (`appsettings.Data.json`).
-- **`WebApplicationBuilderExtensions.AddData()`** — Registers `DataSettings`, wires up DbContext registration, and registers `IKernelDbContext` in DI.
-
 ### Kernel (`Kernel/`)
 
-A class library (not a web project) that provides all shared infrastructure. It targets `net10.0` and references `Microsoft.AspNetCore.App`, Entity Framework Core, and OpenAPI packages.
+A class library (not a web project) that provides all shared infrastructure, database providers (SqlServer, PostgreSQL, MySql/MariaDb, Sqlite, InMemory), persistence abstractions, and cross-cutting concerns. It targets `net10.0` and references `Microsoft.AspNetCore.App`, Entity Framework Core, and OpenAPI packages.
 
 ---
 
@@ -206,7 +195,7 @@ Standardized context for the current operation scope, providing authentication a
 Channel-based outbox message persistence, partition-sharded background processing, fault tolerance, and retention management:
 
 - **`Message`** — Entity storing serialized payload, CLR type, channel, partition, and lifecycle timestamps (`OccurredAt`, `ProcessingAt`, `ProcessedAt`, `NextRetryAt`, `RetryCount`, `LastError`).
-- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a random partition via `IPartitionManager`, and persists to `IKernelDbContext.Messages`.
+- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a random partition via `IPartitionManager`, and persists to `KernelDbContext.Messages`.
 - **`IMessageProcessor`** — Per-channel processing contract (`GetChannel()`, `ProcessMessage()`). Default implementation: `EventMessageProcessor` for `MessageChannel.Event`.
 - **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages by channel to their corresponding processor, returning `Task<Result>`.
 - **`MessageProcessingWorker`** — Hosted `BaseWorker` running on `ProcessingIntervalSeconds`:
@@ -230,11 +219,15 @@ MediatR-style CQRS pattern with attribute-based interceptors:
 ### Persistence & EF Core Interceptors (`Kernel/Persistence/`)
 Shared database infrastructure and automated cross-cutting concerns:
 
-- **`IDbContext`** / **`IKernelDbContext`** — Database context contracts for EF Core operations and outbox messages.
+- **`IDbContext`** — Common interface for database contexts exposing standard EF Core operations.
+- **`IDbContextSchema`** — Interface for DbContexts defining a module schema (`string Schema { get; }`).
+- **`KernelDbContext`** — Concrete DbContext for Kernel entities (`DbSet<Message> Messages`).
+- **`DbContextTypeRegistry`** — Registry of all DbContext types registered across the host and active modules.
+- **`ModelBuilderExtensions`** — `ApplySchema(schema, database)` extension method that sets the default schema on relational databases and safely bypasses providers without schema support (SQLite, InMemory).
 - **`AuditSaveChangesInterceptor`** — Automatically sets `CreatedAt`/`CreatedBy` on entity addition and `UpdatedAt`/`UpdatedBy` on entity modification using `IScopeContext`.
 - **`SoftDeleteSaveChangesInterceptor`** — Converts hard deletes on `ISoftDeletable` entities into soft deletes (`EntityState.Modified`), updating `DeletedAt` and `DeletedBy`.
 - **`DispatchDomainEventsSaveChangesInterceptor`** — Automatically collects and dispatches `DomainEvents` from `IHasDomainEvents` entities through `IEventBus` upon saving and clears them.
-- **`DbContextOptionsBuilderExtensions`** — Helper extension methods (`UseConfiguredDatabase`, `AddKernelInterceptors`) for configuring providers and attaching interceptors.
+- **`DbContextOptionsBuilderExtensions`** — Strongly-typed extension methods (`UseConfiguredDatabase`, `AddKernelInterceptors`) for configuring providers (SqlServer, PostgreSQL, MySql/MariaDb, Sqlite, InMemory) and schema-isolated `MigrationsHistoryTable`.
 
 ### Module System (`Kernel/Modules/`)
 Pluggable module architecture:

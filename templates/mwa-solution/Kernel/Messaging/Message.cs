@@ -9,7 +9,7 @@ public class Message
 	/// <summary>
     /// The message unique identifier.
     /// </summary>
-    public DefaultId Id { get; } = DefaultId.NewUlid();
+    public DefaultId Id { get; set; } = DefaultId.NewUlid();
 
     /// <summary>
     /// CLR type full name of the content.
@@ -29,7 +29,7 @@ public class Message
     /// <summary>
     /// When the message was created.
     /// </summary>
-    public DateTime OccurredAt { get; } = DateTime.UtcNow;
+    public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     /// When the message was successfully processed.

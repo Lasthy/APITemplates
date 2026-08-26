@@ -98,8 +98,8 @@ public class AuthController : ControllerBase
             Response.Cookies.Delete(_identitySettings.CookieName, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Lax
             });
         }
 
@@ -195,8 +195,8 @@ public class AuthController : ControllerBase
         Response.Cookies.Append(_identitySettings.CookieName, accessToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
             Expires = new DateTimeOffset(expiresAt, TimeSpan.Zero)
         });
     }

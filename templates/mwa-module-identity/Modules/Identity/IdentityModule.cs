@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Text;
-using Data.Configuration;
 using Identity.Configuration;
 using Identity.Contracts.Constants;
 using Identity.Controllers;
@@ -100,11 +99,11 @@ public class IdentityModule : IModule
 
             if (dataSettings != null)
             {
-                options.UseConfiguredDatabase(dataSettings.Provider, dataSettings.ConnectionString);
+                options.UseConfiguredDatabase(dataSettings.Provider, dataSettings.ConnectionString, "identity");
             }
             else
             {
-                options.UseConfiguredDatabase("sqlite", "Data Source=identity.db");
+                options.UseConfiguredDatabase("sqlite", "Data Source=identity.db", "identity");
             }
             options.AddKernelInterceptors(sp);
         });

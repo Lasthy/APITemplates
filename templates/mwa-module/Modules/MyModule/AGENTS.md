@@ -228,6 +228,8 @@ services.AddHostedService<ItemSyncWorker>();
 
 ## 7. Entities & Persistence
 
+- **Module DbContext**: Every module includes its own `Persistence/MyModuleDbContext.cs` implementing `IDbContextSchema` (`Schema => "mymodule"`).
+- **Schema Resolving**: Tables are isolated in their own database schema on supported providers (PostgreSQL, SQL Server) and automatically bypassed on SQLite/InMemory.
 - **Identifiers**: Always use `DefaultId` (`System.Ulid`) for primary and foreign keys.
 - **Marker Interfaces**:
   - `IAuditable` — `CreatedAt`, `CreatedBy`, `UpdatedAt`, `UpdatedBy` (auto-populated by SaveChanges interceptors).

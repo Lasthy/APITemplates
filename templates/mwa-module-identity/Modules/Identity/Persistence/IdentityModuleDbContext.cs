@@ -1,4 +1,6 @@
 using Identity.Entities;
+using Kernel.Persistence;
+using Kernel.Persistence.Extensions;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,8 +12,11 @@ namespace Identity.Persistence;
 /// tables with <see cref="DefaultId"/> (Ulid) as the key type, plus custom entities
 /// like <see cref="RefreshToken"/>.
 /// </summary>
-public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, DefaultId>
+public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, DefaultId>, IDbContextSchema
 {
+    /// <inheritdoc/>
+    public string Schema => "identity";
+
     /// <summary>
     /// Refresh tokens for JWT rotation.
     /// </summary>
@@ -20,19 +25,29 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
     public IdentityModuleDbContext(DbContextOptions<IdentityModuleDbContext> options)
         : base(options) { }
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Properties<DefaultId>().HaveConversion<Cysharp.EntityFrameworkCore.UlidToStringConverter>();
+        configurationBuilder.Properties<DefaultId?>().HaveConversion<Cysharp.EntityFrameworkCore.UlidToNullableStringConverter>();
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
+        // Apply "identity" schema if supported by the active database provider (bypassed on SQLite and InMemory)
+        builder.ApplySchema(Schema, Database);
+
         // Apply Ulid value converters to all Identity key columns
         builder.Entity<ApplicationUser>(entity =>
         {
-            entity.Property(e => e.Id).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.Id).HasMaxLength(26);
             entity.Property(e => e.ProfileName).HasMaxLength(64);
             entity.Property(e => e.BanReason).HasMaxLength(500);
-            entity.Property(e => e.BannedBy).HasConversion<string?>().HasMaxLength(26);
-            entity.Property(e => e.CreatedBy).HasConversion<string?>().HasMaxLength(26);
-            entity.Property(e => e.UpdatedBy).HasConversion<string?>().HasMaxLength(26);
+            entity.Property(e => e.BannedBy).HasMaxLength(26);
+            entity.Property(e => e.CreatedBy).HasMaxLength(26);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(26);
 
             entity.HasIndex(e => e.ProfileName);
             entity.HasIndex(e => e.IsBanned);
@@ -40,42 +55,42 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
 
         builder.Entity<ApplicationRole>(entity =>
         {
-            entity.Property(e => e.Id).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.Id).HasMaxLength(26);
         });
 
         // Identity join/claim tables with Ulid key converters
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<DefaultId>>(entity =>
         {
-            entity.Property(e => e.UserId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<DefaultId>>(entity =>
         {
-            entity.Property(e => e.UserId).HasConversion<string>().HasMaxLength(26);
-            entity.Property(e => e.RoleId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
+            entity.Property(e => e.RoleId).HasMaxLength(26);
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<DefaultId>>(entity =>
         {
-            entity.Property(e => e.UserId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<DefaultId>>(entity =>
         {
-            entity.Property(e => e.UserId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
         });
 
         builder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<DefaultId>>(entity =>
         {
-            entity.Property(e => e.RoleId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.RoleId).HasMaxLength(26);
         });
 
         // RefreshToken configuration
         builder.Entity<RefreshToken>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).HasConversion<string>().HasMaxLength(26);
-            entity.Property(e => e.UserId).HasConversion<string>().HasMaxLength(26);
+            entity.Property(e => e.Id).HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
             entity.Property(e => e.Token).HasMaxLength(256).IsRequired();
             entity.Property(e => e.ReplacedByToken).HasMaxLength(256);
 

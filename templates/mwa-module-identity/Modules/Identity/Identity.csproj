@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Kernel/Kernel.csproj" />
-    <ProjectReference Include="../../Data/Data.csproj" />
     <ProjectReference Include="../Identity.Contracts/Identity.Contracts.csproj" />
   </ItemGroup>
 

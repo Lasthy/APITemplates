@@ -1,4 +1,5 @@
 using Kernel.Modules;
+using Kernel.Persistence.Extensions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,25 @@ public class MyModuleModule : IModule
     /// </summary>
     public static void Register(IServiceCollection services, IConfiguration configuration)
     {
+        // Register module DbContext with dynamic database settings and interceptors
+        services.AddDbContext<Persistence.MyModuleDbContext>((sp, options) =>
+        {
+            var ds = sp.GetService<Kernel.Configuration.DynamicSettings>();
+            Kernel.Configuration.DataSettings? dataSettings = null;
+            try { dataSettings = ds?.GetSection<Kernel.Configuration.DataSettings>(); } catch { }
+            dataSettings ??= sp.GetService<Kernel.Configuration.DataSettings>();
+
+            if (dataSettings != null)
+            {
+                options.UseConfiguredDatabase(dataSettings.Provider, dataSettings.ConnectionString, "mymodule");
+            }
+            else
+            {
+                options.UseConfiguredDatabase("sqlite", "Data Source=mymodule.db", "mymodule");
+            }
+            options.AddKernelInterceptors(sp);
+        });
+
         // TODO: Register module services here.
         // Example:
         //   services.AddScoped<IMyService, MyService>();
