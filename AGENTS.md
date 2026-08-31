@@ -19,6 +19,7 @@ Solution Root (MyAPI.slnx)
 ├── Host/                    # ASP.NET Web App — entry point, pipeline, appsettings
 │   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
 ├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
+│   ├── Authorization/       # Policy-based authorization (IAuthorizationPolicy, registry, interceptor, filters)
 │   ├── Common/              # Result pattern
 │   ├── Configuration/       # Dynamic settings system (Controllers/, Features/, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
@@ -276,6 +277,21 @@ A MediatR-style CQRS pattern with an attribute-based interceptor pipeline.
 - **`TransactionAttribute` & `TransactionInterceptor`** — Wraps handler execution in a `TransactionScope` (`TransactionScopeAsyncFlowOption.Enabled`). Commits on `Result.IsSuccess`, rolls back on `Result.IsFailure` or exceptions. Configurable `IsolationLevel`, `TimeoutSeconds`, and `ScopeOption`.
 
 > **Convention:** Place feature requests and handlers in `Features/` vertical slices. Decorate handler classes with `[Logging]`, `[Transaction]`, or `[Intercept<T>]` with optional `Order = n` and custom parameters. Module request handlers are auto-discovered during `AddModule<T>()`.
+
+#### Authorization Policies (`Kernel/Authorization/`)
+A multi-layered, policy-based authorization system that secures internally dispatched requests (handlers), Minimal API routes, and MVC controllers with custom business rules.
+
+- **`IAuthorizationPolicy`** — Policy interface: `PolicyName`, `AuthorizeAsync(IScopeContext context, object? resource, CancellationToken ct)`. Evaluates asynchronously and returns `Result`.
+- **`AuthenticatedPolicy`** — Built-in policy requiring `context.IsAuthenticated`.
+- **`RolePolicy`** — Built-in policy requiring one or more specific roles.
+- **`AuthorizationPolicyRegistry`** — Singleton registry of named policies supporting instance registration and DI type activation (`ActivatorUtilities.GetServiceOrCreateInstance`).
+- **`AuthorizeAttribute`** — Request handler attribute inheriting from `RequestInterceptorAttribute` (`Order = -100`), auto-resolving the named policy before handler execution.
+- **`AuthorizationInterceptor`** — Pipeline interceptor that invokes the named policy and short-circuits with `Result.Failure` on authorization failure.
+- **`AuthorizationEndpointFilter`** — `IEndpointFilter` for Minimal APIs. Returns `401 Unauthorized` for unauthenticated requests, `403 Forbidden` for unauthorized requests, or `500` if the policy is missing.
+- **`AuthorizePolicyAttribute` & `AuthorizationActionFilter`** — Action filter attribute and filter for MVC controllers.
+- **`AuthorizationExtensions`** — Extension methods for `IServiceCollection` (`AddAuthorizationPolicies`, `RegisterAuthorizationPoliciesFromAssembly`) and endpoint route builders (`RequireAuthorizationPolicy`).
+
+> **Convention:** Implement `IAuthorizationPolicy` in any module or Kernel layer. Policies in module assemblies are auto-discovered during `AddModule<T>()`. Protect request handlers with `[Authorize("PolicyName")]`, Minimal APIs with `.RequireAuthorizationPolicy("PolicyName")`, and controllers with `[AuthorizePolicy("PolicyName")]`.
 
 #### EF Core Persistence Abstractions and Infrastructure (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).

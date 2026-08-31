@@ -11,6 +11,7 @@ Solution Root (MyAPI.slnx)
 ├── Host/                    # ASP.NET Web App — entry point, pipeline, static appsettings
 │   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
 ├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
+│   ├── Authorization/       # Policy-based authorization (IAuthorizationPolicy, registry, interceptor, filters)
 │   ├── Common/              # Result pattern (Result, Result<T>, PagedResult<T>)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)

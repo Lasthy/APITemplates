@@ -1,3 +1,5 @@
+using Kernel.Authorization;
+using Kernel.Authorization.Extensions;
 using Kernel.Boxing;
 using Kernel.Configuration;
 using Kernel.Configuration.Controllers;
@@ -44,6 +46,9 @@ public static class WebApplicationBuilderExtensions
         // ── HTTP context / scope context ──────────────────────────────────────
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IScopeContext, WebScopeContext>();
+
+        // ── Authorization infrastructure ──────────────────────────────────────
+        builder.Services.AddAuthorizationPolicies(typeof(WebApplicationBuilderExtensions).Assembly);
 
         // ── Event infrastructure ──────────────────────────────────────────────
         builder.Services.AddSingleton<IEventBus, InProcessEventBus>();

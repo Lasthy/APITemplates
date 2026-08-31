@@ -1,3 +1,4 @@
+using Kernel.Authorization.Extensions;
 using Kernel.Configuration;
 using Kernel.Events;
 using Kernel.Health;
@@ -141,6 +142,9 @@ public static class WebApplicationBuilderExtension
 
         // Register module authorization policies
         builder.Services.AddAuthorization(options => T.RegisterPolicies(options));
+
+        // Discover and register all IAuthorizationPolicy implementations from the module's assembly.
+        builder.Services.RegisterAuthorizationPoliciesFromAssembly(typeof(T).Assembly);
 
         // Register module services.
         T.Register(builder.Services, builder.Configuration);
