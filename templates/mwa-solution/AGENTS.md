@@ -16,6 +16,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (IScopeContext, WebScopeContext)
+│   ├── Email/               # Email delivery abstraction (IEmailSender, SmtpEmailSender, EmailMessage, EmailSettings, template renderer)
 │   ├── Entities/            # Entity marker interfaces (IAuditable, ISoftDeletable, IHasDomainEvents)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
 │   ├── Extensions/          # WebApplicationBuilder extensions (AddKernel, AddData, UseKernel, UseData)
@@ -67,6 +68,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `appsettings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
 | `appsettings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
+| `appsettings.Email.json` | Dynamic settings for email delivery: SMTP host, port, credentials, SSL, From address/name. |
 | `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 
 **Program.cs composition pattern:**
@@ -258,6 +260,15 @@ Dynamic, partition-based rate limiting built on `Microsoft.AspNetCore.RateLimiti
 
 - **`RateLimitingSettings`** — `DynamicSettingsSection` subclass (`SectionName => "RateLimiting"`). Loaded from `appsettings.RateLimiting.json`. Configures `GlobalPolicy` (per IP), `AuthenticatedPolicy` (per User ID), and `EndpointOverrides` (sensitive routes like `auth/login`).
 - **`AddRateLimiting()`** / **`UseRateLimiting()`** — Automatically registered and mounted in `AddKernel()` and `UseKernel()`. Dynamically adapts to runtime configuration changes.
+
+### Email Channel (`Kernel/Email/`, `Kernel/Messaging/`)
+A complete email delivery abstraction and outbox channel processor supporting attachments and dynamic templates:
+
+- **`EmailMessage`** & **`EmailAttachment`** — Strongly-typed email model with recipient lists, subject, HTML body, and binary attachments.
+- **`IEmailSender`** & **`SmtpEmailSender`** — Email sender abstraction and default SMTP implementation using `System.Net.Mail.SmtpClient`.
+- **`IEmailTemplateRenderer`** & **`DefaultEmailTemplateRenderer`** — Simple template renderer supporting token replacement (`{{Key}}`, `{Key}`) and loading templates from files or raw template strings.
+- **`EmailSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Email"`). Loaded from `appsettings.Email.json`.
+- **`EmailMessageProcessor`** — `IMessageProcessor` for `MessageChannel.Email`. Deserializes message payload to `EmailMessage` and sends via `IEmailSender`.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

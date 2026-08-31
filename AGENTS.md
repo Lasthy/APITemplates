@@ -24,6 +24,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Configuration/       # Dynamic settings system (Controllers/, Features/, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (auth, claims)
+│   ├── Email/               # Email delivery abstraction (IEmailSender, SmtpEmailSender, EmailMessage, EmailSettings, template renderer)
 │   ├── Entities/            # Entity marker interfaces (audit, soft-delete, domain events)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
 │   ├── Extensions/          # WebApplicationBuilder extensions (AddKernel, AddData, UseKernel, UseData)
@@ -75,6 +76,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `appsettings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
 | `appsettings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
+| `appsettings.Email.json` | Dynamic settings for email delivery: SMTP host, port, credentials, SSL, From address/name. |
 | `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 
 **Program.cs composition pattern:**
@@ -310,6 +312,20 @@ A dynamic, partition-based rate limiting subsystem built on ASP.NET Core's `Micr
   - `app.UseRateLimiting()` — Mounts `app.UseRateLimiter()` in the HTTP request pipeline.
 
 > **Convention:** Configure default rate limits in `appsettings.RateLimiting.json`. Rate limiting dynamically adapts to runtime setting changes via `DynamicSettings.SetValue()`.
+
+#### Email Channel (`Kernel/Email/`, `Kernel/Messaging/`)
+A complete email delivery abstraction and outbox channel processor supporting attachments and dynamic templates.
+
+- **`EmailMessage`** — Strongly-typed email model: `To`, `Cc`, `Bcc`, `Subject`, `Body`, `IsHtml`, `Attachments` (`List<EmailAttachment>?`).
+- **`EmailAttachment`** — Attachment model: `FileName`, `Content` (`byte[]`), `ContentType` (`string?`).
+- **`IEmailSender`** — Contract: `SendAsync(EmailMessage message, CancellationToken ct)`.
+- **`SmtpEmailSender`** — Default SMTP implementation using `System.Net.Mail.SmtpClient`, configured via `EmailSettings`, with support for multiple recipients and file attachments.
+- **`IEmailTemplateRenderer`** — Contract: `RenderAsync(templateName, variables, ct)`.
+- **`DefaultEmailTemplateRenderer`** — Simple template renderer supporting token replacement (`{{Key}}`, `{Key}`) and loading templates from files or raw template strings.
+- **`EmailSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Email"`). Loaded from `appsettings.Email.json`. Configures `SmtpHost`, `SmtpPort`, `SmtpUsername`, `SmtpPassword`, `EnableSsl`, `FromAddress`, and `FromName`.
+- **`EmailMessageProcessor`** — `IMessageProcessor` for `MessageChannel.Email`. Deserializes message payload to `EmailMessage` and sends via `IEmailSender`.
+
+> **Convention:** To send an email through the outbox, call `IMessageWriter.WriteAsync(emailMessage, MessageChannel.Email)`. For direct synchronous delivery, inject `IEmailSender`.
 
 #### EF Core Persistence Abstractions and Infrastructure (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).

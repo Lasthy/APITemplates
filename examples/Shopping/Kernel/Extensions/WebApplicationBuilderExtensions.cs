@@ -5,6 +5,7 @@ using Kernel.Configuration;
 using Kernel.Configuration.Controllers;
 using Kernel.Configuration.Features;
 using Kernel.Context;
+using Kernel.Email;
 using Kernel.Events;
 using Kernel.Health;
 using Kernel.Health.Checks;
@@ -86,14 +87,22 @@ public static class WebApplicationBuilderExtensions
         var messagingSettings = new MessagingSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(messagingSettings);
 
+        var emailSettings = new EmailSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(emailSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
         builder.Services.AddSingleton(instanceSettings);
         builder.Services.AddSingleton(messagingSettings);
+        builder.Services.AddSingleton(emailSettings);
 
         // ── Rate Limiting ─────────────────────────────────────────────────────
         builder.AddRateLimiting();
+
+        // ── Email infrastructure ──────────────────────────────────────────────
+        builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
+        builder.Services.AddSingleton<IEmailTemplateRenderer, DefaultEmailTemplateRenderer>();
 
         // ── Partition manager ─────────────────────────────────────────────────
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
@@ -102,6 +111,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IMessageWriter, MessageWriter>();
         builder.Services.AddScoped<IMessageDispatcher, MessageDispatcher>();
         builder.Services.AddScoped<IMessageProcessor, EventMessageProcessor>();
+        builder.Services.AddScoped<IMessageProcessor, EmailMessageProcessor>();
         builder.Services.AddHostedService<MessageProcessingWorker>();
         builder.Services.AddHostedService<MessageCleanupWorker>();
 
