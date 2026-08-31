@@ -16,6 +16,7 @@ Solution Root (Shopping.slnx)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (IScopeContext, WebScopeContext)
+│   ├── Diagnostics/         # Observability & diagnostics (CorrelationId, RequestDiagnostics, ActivitySource)
 │   ├── Email/               # Email delivery abstraction (IEmailSender, SmtpEmailSender, EmailMessage, EmailSettings, template renderer)
 │   ├── Entities/            # Entity marker interfaces (IAuditable, ISoftDeletable, IHasDomainEvents)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
@@ -285,6 +286,16 @@ A dispatcher-level request validation subsystem that automatically validates inc
 - **`[Validate]`** / **`ValidateAttribute`** — Request interceptor attribute (`Order = -50`), executing all registered `IValidator<TRequest>` implementations.
 - **`ValidationInterceptor`** — Request pipeline interceptor executing validators and aggregating errors.
 - **`AddValidation()`** / **`RegisterValidatorsFromAssembly()`** — Automatically scans and registers validators in DI during `AddKernel()` and `AddModule<T>()`.
+
+### Observability & Diagnostics (`Kernel/Diagnostics/`)
+Comprehensive HTTP and outbox observability infrastructure with correlation tracking, request duration metrics, and OpenTelemetry diagnostic activities:
+
+- **`DiagnosticsConstants`** — Common diagnostic identifiers: `CorrelationIdHeader` (`"X-Correlation-Id"`), `CorrelationIdItemKey` (`"CorrelationId"`), `ActivitySourceName` (`"Kernel"`), `CorrelationIdTag` (`"correlation.id"`), and static `ActivitySource`.
+- **`CorrelationIdMiddleware`** — HTTP middleware that extracts the `X-Correlation-Id` header or generates a new Ulid `DefaultId`. Stores it in `HttpContext.Items`, attaches it to response headers, and tags the ambient `HttpRequest` Activity.
+- **`RequestDiagnosticsMiddleware`** — HTTP middleware that measures execution time and emits structured logs: HTTP method, path, status code, duration in milliseconds, correlation ID, and authenticated user ID.
+- **`DiagnosticsExtensions`** — Extension methods `app.UseCorrelationId()` and `app.UseRequestDiagnostics()` for configuring the HTTP pipeline in `UseKernel()`.
+
+> **Convention:** All outbound outbox messages automatically capture the ambient request's correlation ID via `IMessageWriter`. Use `IScopeContext.CorrelationId` to correlate logs and operations across services.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

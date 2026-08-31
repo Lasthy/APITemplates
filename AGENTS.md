@@ -24,6 +24,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Configuration/       # Dynamic settings system (Controllers/, Features/, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (auth, claims)
+│   ├── Diagnostics/         # Observability & diagnostics (CorrelationId, RequestDiagnostics, ActivitySource)
 │   ├── Email/               # Email delivery abstraction (IEmailSender, SmtpEmailSender, EmailMessage, EmailSettings, template renderer)
 │   ├── Entities/            # Entity marker interfaces (audit, soft-delete, domain events)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
@@ -171,8 +172,8 @@ Corresponding file `appsettings.Payment.json`:
 #### Scope Context (`Kernel/Context/`)
 Standardized context for the current operation scope, providing authentication information.
 
-- **`IScopeContext`** — Interface: `UserId` (`DefaultId?`), `IsAuthenticated`, `Roles`, `Claims`, `GetClaim()`, `GetClaimValues()`, `IsInRole()`, `IsSystem`.
-- **`WebScopeContext`** — Implementation backed by `IHttpContextAccessor`. Extracts user ID from `NameIdentifier` or `sub` claim, parses to `DefaultId`. Caches roles and claims. Has a protected constructor accepting `ClaimsPrincipal` for derived contexts. Implements `IsSystem => IsInRole(Constants.Roles.System)`.
+- **`IScopeContext`** — Interface: `UserId` (`DefaultId?`), `IsAuthenticated`, `Roles`, `Claims`, `GetClaim()`, `GetClaimValues()`, `IsInRole()`, `IsSystem`, `CorrelationId`.
+- **`WebScopeContext`** — Implementation backed by `IHttpContextAccessor`. Extracts user ID from `NameIdentifier` or `sub` claim, parses to `DefaultId`. Extracts correlation ID from `HttpContext.Items`, `X-Correlation-Id` header, or ambient `Activity`. Caches roles and claims. Has protected constructors accepting `ClaimsPrincipal` and optional `correlationId` for derived contexts. Implements `IsSystem => IsInRole(Constants.Roles.System)`.
 
 > **Convention:** Inject `IScopeContext` into handlers and services. For non-web contexts (workers, event handlers), create a derived context.
 
@@ -224,9 +225,9 @@ Infrastructure for pluggable modules.
 #### Messaging / Outbox (`Kernel/Messaging/`)
 A channel-based message persistence, partition-sharded background processing, and retention system (outbox pattern).
 
-- **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`. Exposes state helper methods: `MarkProcessing()`, `MarkProcessed()`, `MarkFailed()`, `MarkTimedOut()`, `IsProcessingTimedOut()`.
+- **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`, `CorrelationId`. Exposes state helper methods: `MarkProcessing()`, `MarkProcessed()`, `MarkFailed()`, `MarkTimedOut()`, `IsProcessingTimedOut()`.
 - **`MessageChannel`** — Enum: `Event`, `Email`.
-- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition via `IPartitionManager`, persists to `KernelDbContext.Messages`.
+- **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition via `IPartitionManager`, captures ambient `CorrelationId` from `IScopeContext`, persists to `KernelDbContext.Messages`.
 - **`IMessageProcessor`** — Per-channel processor: `GetChannel()`, `ProcessMessage()`.
 - **`EventMessageProcessor`** — Processes `MessageChannel.Event` messages: resolves event type via `IEventTypeRegistry`, deserializes, publishes to `IEventBus` within a `TransactionScope`.
 - **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages to the correct `IMessageProcessor` by channel, returning `Task<Result>`.
@@ -238,6 +239,16 @@ A channel-based message persistence, partition-sharded background processing, an
 - **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
 
 > **Note:** The `Message` class and related types use `Kernel.Boxing` namespace (not `Kernel.Messaging`). This is the current convention.
+
+#### Observability & Diagnostics (`Kernel/Diagnostics/`)
+Comprehensive HTTP and outbox observability infrastructure with correlation tracking, request duration metrics, and OpenTelemetry diagnostic activities.
+
+- **`DiagnosticsConstants`** — Common diagnostic identifiers: `CorrelationIdHeader` (`"X-Correlation-Id"`), `CorrelationIdItemKey` (`"CorrelationId"`), `ActivitySourceName` (`"Kernel"`), `CorrelationIdTag` (`"correlation.id"`), and static `ActivitySource`.
+- **`CorrelationIdMiddleware`** — HTTP middleware that extracts the `X-Correlation-Id` header or generates a new Ulid `DefaultId`. Stores it in `HttpContext.Items`, attaches it to response headers, and tags the ambient `HttpRequest` Activity.
+- **`RequestDiagnosticsMiddleware`** — HTTP middleware that measures execution time and emits structured logs: HTTP method, path, status code, duration in milliseconds, correlation ID, and authenticated user ID.
+- **`DiagnosticsExtensions`** — Extension methods `app.UseCorrelationId()` and `app.UseRequestDiagnostics()` for configuring the HTTP pipeline in `UseKernel()`.
+
+> **Convention:** All outbound outbox messages automatically capture the ambient request's correlation ID via `IMessageWriter`. Use `IScopeContext.CorrelationId` to correlate logs and operations across services.
 
 #### JSON Serialization (`Kernel/Json/`)
 Centralized JSON serializer with consistent configuration.

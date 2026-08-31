@@ -43,11 +43,13 @@ public class KernelDbContext : DbContext, IDbContextSchema
             entity.Property(e => e.Content).IsRequired();
             entity.Property(e => e.Channel).HasConversion<string>().HasMaxLength(50);
             entity.Property(e => e.LastError).HasMaxLength(2000);
+            entity.Property(e => e.CorrelationId).HasMaxLength(100);
 
             entity.HasIndex(e => e.Partition);
             entity.HasIndex(e => e.ProcessedAt);
             entity.HasIndex(e => e.ProcessingAt);
             entity.HasIndex(e => e.NextRetryAt);
+            entity.HasIndex(e => e.CorrelationId);
         });
     }
 }

@@ -52,4 +52,9 @@ public interface IScopeContext
     /// granting unrestricted access to all kernel-level and administrative operations.
     /// </summary>
     bool IsSystem { get; }
+
+    /// <summary>
+    /// The correlation identifier for the current operation scope/request.
+    /// </summary>
+    string? CorrelationId { get; }
 }

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kernel.Constants;
+using Kernel.Diagnostics;
 using Microsoft.AspNetCore.Http;
 
 namespace Kernel.Context;
@@ -10,12 +11,15 @@ namespace Kernel.Context;
 /// </summary>
 public class WebScopeContext : IScopeContext
 {
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly ClaimsPrincipal? _user;
+    private readonly string? _explicitCorrelationId;
     private IReadOnlyList<string>? _roles;
     private IReadOnlyDictionary<string, string>? _claims;
 
     public WebScopeContext(IHttpContextAccessor httpContextAccessor)
     {
+        _httpContextAccessor = httpContextAccessor;
         _user = httpContextAccessor.HttpContext?.User;
     }
 
@@ -26,6 +30,16 @@ public class WebScopeContext : IScopeContext
     protected WebScopeContext(ClaimsPrincipal? user)
     {
         _user = user;
+    }
+
+    /// <summary>
+    /// Protected constructor to allow modules and workers to create derived contexts
+    /// with an explicit correlation identifier.
+    /// </summary>
+    protected WebScopeContext(ClaimsPrincipal? user, string? correlationId)
+    {
+        _user = user;
+        _explicitCorrelationId = correlationId;
     }
 
     /// <inheritdoc/>
@@ -83,4 +97,31 @@ public class WebScopeContext : IScopeContext
 
     /// <inheritdoc/>
     public bool IsSystem => IsInRole(Constants.Roles.System);
+
+    /// <inheritdoc/>
+    public string? CorrelationId
+    {
+        get
+        {
+            if (_httpContextAccessor?.HttpContext != null)
+            {
+                var context = _httpContextAccessor.HttpContext;
+                if (context.Items.TryGetValue(DiagnosticsConstants.CorrelationIdItemKey, out var itemVal)
+                    && itemVal is string s
+                    && !string.IsNullOrWhiteSpace(s))
+                {
+                    return s;
+                }
+
+                var headerVal = context.Request?.Headers?[DiagnosticsConstants.CorrelationIdHeader].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(headerVal))
+                {
+                    return headerVal;
+                }
+            }
+
+            return _explicitCorrelationId
+                ?? System.Diagnostics.Activity.Current?.GetTagItem(DiagnosticsConstants.CorrelationIdTag)?.ToString();
+        }
+    }
 }

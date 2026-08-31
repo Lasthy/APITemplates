@@ -60,6 +60,11 @@ public class Message
 	/// The error message of the last processing attempt.
 	/// </summary>
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// Correlation identifier for end-to-end tracing across requests and messages.
+    /// </summary>
+    public string? CorrelationId { get; set; }
 	
 	public void IncrementRetryAttempts() {
 		RetryCount++;

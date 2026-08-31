@@ -32,6 +32,7 @@ public class AuthorizationPolicyTests : IClassFixture<ShoppingApiTestFactory>
         public IReadOnlyList<string> Roles { get; set; } = [];
         public IReadOnlyDictionary<string, string> Claims { get; set; } = new Dictionary<string, string>();
         public bool IsSystem => IsInRole(Kernel.Constants.Roles.System);
+        public string? CorrelationId { get; set; }
 
         public string? GetClaim(string claimType) => Claims.TryGetValue(claimType, out var v) ? v : null;
         public IReadOnlyList<string> GetClaimValues(string claimType) => Claims.TryGetValue(claimType, out var v) ? [v] : [];

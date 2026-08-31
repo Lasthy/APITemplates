@@ -5,6 +5,8 @@ using Kernel.Configuration;
 using Kernel.Configuration.Controllers;
 using Kernel.Configuration.Features;
 using Kernel.Context;
+using Kernel.Diagnostics;
+using Kernel.Diagnostics.Extensions;
 using Kernel.Email;
 using Kernel.Events;
 using Kernel.Health;
@@ -219,6 +221,10 @@ public static class WebApplicationBuilderExtensions
         var dynamicSettings = app.Services.GetRequiredService<DynamicSettings>();
         var eventBus = app.Services.GetRequiredService<IEventBus>();
         dynamicSettings.SetEventBus(eventBus);
+
+        // HTTP correlation ID and request diagnostics
+        app.UseCorrelationId();
+        app.UseRequestDiagnostics();
 
         // Expose the OpenAPI JSON documents globally. 
         app.MapOpenApi();
