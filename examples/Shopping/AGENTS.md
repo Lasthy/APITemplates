@@ -270,6 +270,16 @@ A complete email delivery abstraction and outbox channel processor supporting at
 - **`EmailSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Email"`). Loaded from `appsettings.Email.json`.
 - **`EmailMessageProcessor`** — `IMessageProcessor` for `MessageChannel.Email`. Deserializes message payload to `EmailMessage` and sends via `IEmailSender`.
 
+### Validation Interceptor (`Kernel/Validation/`)
+A dispatcher-level request validation subsystem that automatically validates incoming requests before handler execution and short-circuits with structured field errors:
+
+- **`IValidator<T>`** — Validation contract: `ValidationResult Validate(T request)`.
+- **`ValidationError`** & **`ValidationResult`** — Structured validation error and result objects.
+- **`ValidationException`** — Exception wrapping `ValidationResult` and `Errors`, formatted into `Result.Failure`.
+- **`[Validate]`** / **`ValidateAttribute`** — Request interceptor attribute (`Order = -50`), executing all registered `IValidator<TRequest>` implementations.
+- **`ValidationInterceptor`** — Request pipeline interceptor executing validators and aggregating errors.
+- **`AddValidation()`** / **`RegisterValidatorsFromAssembly()`** — Automatically scans and registers validators in DI during `AddKernel()` and `AddModule<T>()`.
+
 ### Module Scaffolding
 Use the helper scripts from the solution root:
 ```powershell

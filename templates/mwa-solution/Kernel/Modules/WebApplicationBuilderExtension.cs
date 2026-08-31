@@ -4,6 +4,7 @@ using Kernel.Events;
 using Kernel.Health;
 using Kernel.Json;
 using Kernel.Requests;
+using Kernel.Validation.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -161,6 +162,9 @@ public static class WebApplicationBuilderExtension
 
         // Register all IRequestHandler<,> implementations from the module's assembly.
         RegisterRequestHandlers(builder.Services, typeof(T).Assembly);
+
+        // Discover and register all IValidator<> implementations from the module's assembly.
+        builder.Services.RegisterValidatorsFromAssembly(typeof(T).Assembly);
 
         // Discover and register all IHealthCheck implementations from the module's assembly.
         var healthCheckRegistry = builder.Services

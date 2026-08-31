@@ -327,6 +327,19 @@ A complete email delivery abstraction and outbox channel processor supporting at
 
 > **Convention:** To send an email through the outbox, call `IMessageWriter.WriteAsync(emailMessage, MessageChannel.Email)`. For direct synchronous delivery, inject `IEmailSender`.
 
+#### Validation Interceptor (`Kernel/Validation/`)
+A dispatcher-level request validation subsystem that automatically validates incoming requests before handler execution and short-circuits with structured field errors.
+
+- **`IValidator<T>`** — Validation contract: `ValidationResult Validate(T request)`. Implement this interface to define request validation rules.
+- **`ValidationError`** — `record(Field, Message)` representing a single field violation.
+- **`ValidationResult`** — Encapsulates `Errors` (`IReadOnlyList<ValidationError>`) and `IsValid` (`bool`). Factory methods: `Success()`, `Failure(params ValidationError[] errors)`, `Failure(string field, string message)`, `Failure(IEnumerable<ValidationError> errors)`.
+- **`ValidationException`** — Exception wrapping `ValidationResult` and `Errors`, formatting error summaries. Wrapped inside `Result.Failure<TResponse>()`.
+- **`ValidateAttribute`** — Request interceptor attribute (`[Validate]`, `Order = -50`, running after authorization and before logging/transactions). Resolves all registered `IValidator<TRequest>` implementations from DI and executes them.
+- **`ValidationInterceptor`** — Pipeline interceptor executing validators and aggregating errors into `Result.Failure` on failure.
+- **`ValidationExtensions`** — Extension methods: `AddValidation(assemblies)` and `RegisterValidatorsFromAssembly(assembly)` for registering validators in DI as scoped services.
+
+> **Convention:** Implement `IValidator<YourRequest>` in your feature slice or module. All `IValidator<>` implementations in module assemblies are auto-discovered and registered during `AddModule<T>()`. Decorate your handler with `[Validate]` to enable automated validation.
+
 #### EF Core Persistence Abstractions and Infrastructure (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).
 - **`IDbContextSchema`** — Interface for DbContexts defining a module schema (`string Schema { get; }`).

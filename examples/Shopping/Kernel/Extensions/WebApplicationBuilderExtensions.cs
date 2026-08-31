@@ -21,6 +21,8 @@ using Kernel.Persistence.Extensions;
 using Kernel.RateLimiting;
 using Kernel.RateLimiting.Extensions;
 using Kernel.Requests;
+using Kernel.Validation;
+using Kernel.Validation.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -52,6 +54,9 @@ public static class WebApplicationBuilderExtensions
 
         // ── Authorization infrastructure ──────────────────────────────────────
         builder.Services.AddAuthorizationPolicies(typeof(WebApplicationBuilderExtensions).Assembly);
+
+        // ── Validation infrastructure ─────────────────────────────────────────
+        builder.Services.AddValidation(typeof(WebApplicationBuilderExtensions).Assembly);
 
         // ── Event infrastructure ──────────────────────────────────────────────
         builder.Services.AddSingleton<IEventBus, InProcessEventBus>();
@@ -130,6 +135,7 @@ public static class WebApplicationBuilderExtensions
 
         // ── Configuration & Health Features ───────────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
+        builder.Services.AddTransient<ValidationInterceptor>();
         builder.Services.AddTransient<LoggingInterceptor>();
         builder.Services.AddTransient<TransactionInterceptor>();
         builder.Services.AddScoped<IRequestHandler<GetSettings, string>, GetSettingsHandler>();
