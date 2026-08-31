@@ -12,7 +12,7 @@ Solution Root (MyAPI.slnx)
 │   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
 ├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
 │   ├── Authorization/       # Policy-based authorization (IAuthorizationPolicy, registry, interceptor, filters)
-│   ├── Common/              # Result pattern (Result, Result<T>, PagedResult<T>)
+│   ├── Common/              # Result pattern (Result, Result<T>, PaginatedResult<T>)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
 │   ├── Context/             # Scoped operation context (IScopeContext, WebScopeContext)
@@ -155,15 +155,21 @@ When `Orders` creates an order and `Notifications` needs to react:
 
 ## Core Features & Conventions
 
-### Standardized Result (`Kernel/Common/`)
-Railway-oriented result pattern for operation outcomes.
+### Standardized Result & Pagination (`Kernel/Common/`)
+Railway-oriented result pattern for operation outcomes and standardized query pagination and sorting.
 
 - **`Result`** — Base record: `IsSuccess`, `IsFailure`, `Messages[]`, `Error` (Exception, `[JsonIgnore]`). Factory methods: `Success()`, `Failure(Exception)`, `Success<T>(value)`, `Failure<T>(error)`. Has `Match<TOut>()`.
 - **`Result<T>`** — Generic variant with `Value`. Supports `Map()`, `Bind()`, `Match()`.
-- **`PagedResult<T>`** — Extends `Result<IEnumerable<T>>` with `Page` and `PageSize`.
+- **`PaginatedResult<T>`** — Extends `Result<IEnumerable<T>>` with `Page`, `PageSize`, `TotalCount`, `TotalPages`, `HasNextPage`, `HasPreviousPage`, and `Items`. Factory methods: `Create()`, `Success()`, `Empty()`, `Failure()`.
+- **`PaginatedQuery`** — Base record for paginated query requests: `Page` (default 1), `PageSize` (default 20), `SortBy` (nullable string), `SortDirection` (`Ascending`/`Descending`), `MaxPageSize` (virtual, default 100), with normalization helpers `GetNormalizedPage()` and `GetNormalizedPageSize()`.
+- **`SortDirection`** — Enum: `Ascending`, `Descending`.
+- **`QueryableExtensions`** — Extension methods for `IQueryable<T>` and `IEnumerable<T>`:
+  - `ApplySort(sortBy, direction)` / `ApplySort(pagination)` — Dynamic case-insensitive sorting by property path (including nested properties like `"Category.Title"`).
+  - `ApplyPagination(pagination)` / `ApplyPagination(page, pageSize, maxPageSize)` — Applies sorting and pagination (`Skip`/`Take`).
+  - `ToPaginatedResultAsync(pagination, ct)` / `ToPaginatedResult(pagination)` — Materializes query into a `PaginatedResult<T>` with total count (supporting both EF Core async and in-memory fallback).
 - **`ResultExtensions`** — Async extension methods: `MapAsync`, `BindAsync`, `MatchAsync`.
 
-> **Convention:** All operations should return `Result` or `Result<T>`. Never throw exceptions for expected failures — wrap them in `Result.Failure()`.
+> **Convention:** All operations should return `Result`, `Result<T>`, or `PaginatedResult<T>`. Query endpoints with pagination should inherit from `PaginatedQuery` and use `.ToPaginatedResultAsync(request, ct)`. Never throw exceptions for expected failures — wrap them in `Result.Failure()`.
 
 ### Dynamic Configuration (`Kernel/Configuration/`)
 A runtime-mutable, convention-based settings system that reads from JSON files, supports environment overlays and environment variables, integrates directly into ASP.NET's `IConfiguration`, auto-persists changes, and raises events on mutation.

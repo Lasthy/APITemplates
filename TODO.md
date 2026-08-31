@@ -13,7 +13,7 @@
 | 2 | [Rate Limiting](#2--rate-limiting) | ✅ Completed | `Kernel/RateLimiting/` |
 | 3 | [Email Channel](#3--email-channel) | ✅ Completed | `Kernel/Messaging/`, `Kernel/Email/` |
 | 4 | [Validation Interceptor](#4--validation-interceptor) | ✅ Completed | `Kernel/Validation/` |
-| 5 | [Pagination & Filtering](#5--pagination--filtering) | 🟠 High | `Kernel/Common/` |
+| 5 | [Pagination & Filtering](#5--pagination--filtering) | ✅ Completed | `Kernel/Common/` |
 | 6 | [Observability / Diagnostics](#6--observability--diagnostics) | 🟠 High | `Kernel/Diagnostics/` |
 | 7 | [Structured Audit Log](#7--structured-audit-log) | 🟡 Medium | `Kernel/AuditLog/` |
 | 8 | [Caching Abstraction](#8--caching-abstraction) | 🟡 Medium | `Kernel/Caching/` |
@@ -569,18 +569,18 @@ public class CreateUserHandler : IRequestHandler<CreateUser, UserDto> { ... }
 
 ---
 
-## 5. 📋 Pagination & Filtering
+## 5. 📋 Pagination & Filtering ✅
 
-**Priority:** 🟠 High  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Common/`
 
 ### Motivation
 
-[`PagedResult<T>`](file:///d:/Dev/APITemplates/templates/mwa-solution/Kernel/Common/PagedResult.cs) exists as an output wrapper but there's no input abstraction. Every list handler re-implements skip/take/ordering. A shared `PaginatedQuery` base and `IQueryable` extensions would eliminate boilerplate.
+[`PaginatedResult<T>`](file:///d:/Dev/APITemplates/templates/mwa-solution/Kernel/Common/PaginatedResult.cs) exists as an output wrapper but there's no input abstraction. Every list handler re-implements skip/take/ordering. A shared `PaginatedQuery` base and `IQueryable` extensions would eliminate boilerplate.
 
 ### Design Overview
 
-A `PaginatedQuery` base record for input, `IQueryable<T>` extension methods for applying pagination and sorting, and factory methods on `PagedResult<T>` for easy construction.
+A `PaginatedQuery` base record for input, `IQueryable<T>` extension methods for applying pagination and sorting, and factory methods on `PaginatedResult<T>` for easy construction.
 
 ### File Inventory
 
@@ -588,8 +588,8 @@ A `PaginatedQuery` base record for input, `IQueryable<T>` extension methods for 
 Kernel/Common/
 ├── PaginatedQuery.cs              [NEW] — Base input record
 ├── SortDirection.cs               [NEW] — Enum (Ascending/Descending)
-├── QueryableExtensions.cs         [NEW] — ApplyPagination, ApplySort, ToPagedResultAsync
-├── PagedResult.cs                 [MODIFY] — Add factory methods
+├── QueryableExtensions.cs         [NEW] — ApplyPagination, ApplySort, ToPaginatedResultAsync
+├── PaginatedResult.cs             [NEW] — Paginated result record and factory methods
 ```
 
 ### Interface Shapes
@@ -621,9 +621,9 @@ public static class QueryableExtensions
     public static IQueryable<T> ApplyPagination<T>(this IQueryable<T> query, PaginatedQuery pagination) { ... }
 
     /// <summary>
-    /// Materializes the query and wraps in a PagedResult with total count.
+    /// Materializes the query and wraps in a PaginatedResult with total count.
     /// </summary>
-    public static async Task<PagedResult<T>> ToPagedResultAsync<T>(
+    public static async Task<PaginatedResult<T>> ToPaginatedResultAsync<T>(
         this IQueryable<T> query,
         PaginatedQuery pagination,
         CancellationToken ct = default) { ... }
@@ -639,19 +639,19 @@ var result = await dbContext.Users
     .Where(u => search == null || u.UserName.Contains(search))
     .ApplyPagination(request)
     .Select(u => new UserDto(...))
-    .ToPagedResultAsync(request, ct);
+    .ToPaginatedResultAsync(request, ct);
 ```
 
-### Changes to PagedResult
+### Changes to PaginatedResult
 
 ```csharp
-// Add to PagedResult<T>:
+// In PaginatedResult<T>:
 public int TotalCount { get; }
-public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
 public bool HasNextPage => Page < TotalPages;
 public bool HasPreviousPage => Page > 1;
 
-public static PagedResult<T> Create(IEnumerable<T> items, int page, int pageSize, int totalCount) { ... }
+public static PaginatedResult<T> Create(IEnumerable<T> items, int page, int pageSize, int totalCount) { ... }
 ```
 
 ---
@@ -1150,11 +1150,11 @@ public class ApiKey : IAuditable
 
 ## Summary Checklist
 
-- [ ] **#1 — Authorization Policies** (`IAuthorizationPolicy` + dispatcher interceptor + endpoint/controller filters)
-- [ ] **#2 — Rate Limiting** (ASP.NET middleware + `RateLimitingSettings` + per-endpoint config)
-- [ ] **#3 — Email Channel** (`IEmailSender` + SMTP impl + `EmailMessageProcessor`)
-- [ ] **#4 — Validation Interceptor** (`IValidator<T>` + `[Validate]` attribute + auto-discovery)
-- [ ] **#5 — Pagination & Filtering** (`PaginatedQuery` + `IQueryable` extensions + `PagedResult` improvements)
+- [x] **#1 — Authorization Policies** (`IAuthorizationPolicy` + dispatcher interceptor + endpoint/controller filters)
+- [x] **#2 — Rate Limiting** (ASP.NET middleware + `RateLimitingSettings` + per-endpoint config)
+- [x] **#3 — Email Channel** (`IEmailSender` + SMTP impl + `EmailMessageProcessor`)
+- [x] **#4 — Validation Interceptor** (`IValidator<T>` + `[Validate]` attribute + auto-discovery)
+- [x] **#5 — Pagination & Filtering** (`PaginatedQuery` + `IQueryable` extensions + `PaginatedResult` improvements)
 - [ ] **#6 — Observability** (correlation ID + request diagnostics middleware)
 - [ ] **#7 — Structured Audit Log** (`AuditEntry` + SaveChanges interceptor + query endpoint)
 - [ ] **#8 — Caching** (`ICacheService` + in-memory default + `[Cache]` interceptor)
