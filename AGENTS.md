@@ -33,6 +33,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Modules/             # IModule contract + module registration infrastructure
 │   ├── Partitioning/        # Partition management for multi-instance deployments
 │   ├── Persistence/         # IDbContext, IDbContextSchema, KernelDbContext, DbContextTypeRegistry + SaveChanges interceptors
+│   ├── RateLimiting/        # Dynamic, partition-based rate limiting (RateLimitingSettings, extensions)
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces (stub)
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service
@@ -74,6 +75,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `appsettings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
 | `appsettings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
+| `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -292,6 +294,22 @@ A multi-layered, policy-based authorization system that secures internally dispa
 - **`AuthorizationExtensions`** — Extension methods for `IServiceCollection` (`AddAuthorizationPolicies`, `RegisterAuthorizationPoliciesFromAssembly`) and endpoint route builders (`RequireAuthorizationPolicy`).
 
 > **Convention:** Implement `IAuthorizationPolicy` in any module or Kernel layer. Policies in module assemblies are auto-discovered during `AddModule<T>()`. Protect request handlers with `[Authorize("PolicyName")]`, Minimal APIs with `.RequireAuthorizationPolicy("PolicyName")`, and controllers with `[AuthorizePolicy("PolicyName")]`.
+
+#### Rate Limiting (`Kernel/RateLimiting/`)
+A dynamic, partition-based rate limiting subsystem built on ASP.NET Core's `Microsoft.AspNetCore.RateLimiting` and `System.Threading.RateLimiting`, adjustable at runtime via `RateLimitingSettings` and `appsettings.RateLimiting.json`.
+
+- **`RateLimitingSettings`** — `DynamicSettingsSection` subclass (`SectionName => "RateLimiting"`). Exposes:
+  - `Enabled` (`bool`, default: `true`).
+  - `GlobalPolicy` (`RateLimitPolicyConfig`: `PermitLimit = 200, WindowSeconds = 60, QueueLimit = 0, SegmentsPerWindow = 1`) for unauthenticated requests partitioned by IP.
+  - `AuthenticatedPolicy` (`RateLimitPolicyConfig`: `PermitLimit = 500, WindowSeconds = 60, QueueLimit = 0, SegmentsPerWindow = 1`) for authenticated requests partitioned by User ID.
+  - `EndpointOverrides` (`Dictionary<string, RateLimitEndpointConfig>`) for specific routes (e.g. `auth/login`, `auth/forgot-password`, `auth/refresh`).
+  - `RejectionStatusCode` (`int`, default: `429`).
+  - `RejectionMessage` (`string`, default: `"Too many requests. Please try again later."`).
+- **`RateLimitingExtensions`** — Extension methods:
+  - `builder.AddRateLimiting()` — Registers `RateLimitingSettings` and configures ASP.NET Core `AddRateLimiter` with custom rejection response handling and `PartitionedRateLimiter.Create<HttpContext, string>` evaluating dynamic settings per request.
+  - `app.UseRateLimiting()` — Mounts `app.UseRateLimiter()` in the HTTP request pipeline.
+
+> **Convention:** Configure default rate limits in `appsettings.RateLimiting.json`. Rate limiting dynamically adapts to runtime setting changes via `DynamicSettings.SetValue()`.
 
 #### EF Core Persistence Abstractions and Infrastructure (`Kernel/Persistence/`)
 - **`IDbContext`** — Common DbContext interface declaring standard EF Core operations (`Database`, `ChangeTracker`, `Set<T>()`, `Entry<T>()`, `SaveChanges()`, `SaveChangesAsync()`).

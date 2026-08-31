@@ -17,6 +17,8 @@ using Kernel.Modules;
 using Kernel.Partitioning;
 using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
+using Kernel.RateLimiting;
+using Kernel.RateLimiting.Extensions;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +91,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(applicationSettings);
         builder.Services.AddSingleton(instanceSettings);
         builder.Services.AddSingleton(messagingSettings);
+
+        // ── Rate Limiting ─────────────────────────────────────────────────────
+        builder.AddRateLimiting();
 
         // ── Partition manager ─────────────────────────────────────────────────
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
@@ -201,6 +206,8 @@ public static class WebApplicationBuilderExtensions
 
         // Expose the OpenAPI JSON documents globally. 
         app.MapOpenApi();
+
+        app.UseRateLimiting();
 
         app.MapControllers();
     }

@@ -25,6 +25,7 @@ Solution Root (Shopping.slnx)
 │   ├── Modules/             # IModule contract + module registration infrastructure
 │   ├── Partitioning/        # Partition management for multi-instance deployments
 │   ├── Persistence/         # IDbContext, IDbContextSchema, KernelDbContext, DbContextTypeRegistry + EF SaveChanges interceptors
+│   ├── RateLimiting/        # Dynamic, partition-based rate limiting (RateLimitingSettings, extensions)
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
@@ -66,6 +67,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Data.{Environment}.json` | Optional environment overlay for database settings. |
 | `appsettings.Instance.json` | Per-instance dynamic settings: OpenAPI viewer choice, partition range, active modules dictionary. |
 | `appsettings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
+| `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -250,6 +252,12 @@ Modular health report system grouped by module:
   - `GET api/v1/kernel/health/ready` (`[AllowAnonymous]`) — Readiness probe (200 OK or 503).
   - `GET api/v1/kernel/health/report` (`[Authorize(Roles = Roles.System)]`) — Full system health report.
   - `GET api/v1/kernel/health/report/{moduleName}` (`[Authorize(Roles = Roles.System)]`) — Module health report.
+
+### Rate Limiting (`Kernel/RateLimiting/`)
+Dynamic, partition-based rate limiting built on `Microsoft.AspNetCore.RateLimiting`:
+
+- **`RateLimitingSettings`** — `DynamicSettingsSection` subclass (`SectionName => "RateLimiting"`). Loaded from `appsettings.RateLimiting.json`. Configures `GlobalPolicy` (per IP), `AuthenticatedPolicy` (per User ID), and `EndpointOverrides` (sensitive routes like `auth/login`).
+- **`AddRateLimiting()`** / **`UseRateLimiting()`** — Automatically registered and mounted in `AddKernel()` and `UseKernel()`. Dynamically adapts to runtime configuration changes.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:
