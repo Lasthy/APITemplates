@@ -11,6 +11,7 @@ Solution Root (MyAPI.slnx)
 ├── Host/                    # ASP.NET Web App — entry point, pipeline, static appsettings
 │   └── Program.cs           # builder.AddKernel() + builder.AddData() + builder.AddModules()
 ├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
+│   ├── AuditLog/            # Structured audit logging (AuditEntry, SaveChanges interceptor, service, controller)
 │   ├── Authorization/       # Policy-based authorization (IAuthorizationPolicy, registry, interceptor, filters)
 │   ├── Common/              # Result pattern (Result, Result<T>, PaginatedResult<T>)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
@@ -296,6 +297,19 @@ Comprehensive HTTP and outbox observability infrastructure with correlation trac
 - **`DiagnosticsExtensions`** — Extension methods `app.UseCorrelationId()` and `app.UseRequestDiagnostics()` for configuring the HTTP pipeline in `UseKernel()`.
 
 > **Convention:** All outbound outbox messages automatically capture the ambient request's correlation ID via `IMessageWriter`. Use `IScopeContext.CorrelationId` to correlate logs and operations across services.
+
+### Structured Audit Log (`Kernel/AuditLog/`)
+A centralized, queryable audit trail capturing entity mutations with property-level diffs, user identity, and correlation tracking:
+
+- **`AuditAction`** — Enum: `Create`, `Update`, `Delete`.
+- **`AuditPropertyChange`** — Record: `PropertyName`, `OldValue`, `NewValue`.
+- **`AuditEntry`** — Entity: `Id` (`DefaultId`), `UserId` (`DefaultId?`), `EntityType`, `EntityId`, `Action` (`AuditAction`), `Changes` (JSON array of `AuditPropertyChange`), `CorrelationId`, `OccurredAt`. Persisted in `KernelDbContext.AuditEntries`.
+- **`AuditLogSaveChangesInterceptor`** — Scoped `SaveChangesInterceptor` capturing entity mutations across all `DbContext`s (creates, updates with property diffs, deletes) and persisting `AuditEntry` records into `KernelDbContext`. Skips internal `AuditEntry` and `Message` entities to prevent recursion/noise.
+- **`IAuditLogService` / `AuditLogService`** — Service for querying `AuditEntry` records with filtering (`EntityType`, `EntityId`, `UserId`, `Action`, date ranges, `CorrelationId`) and dynamic pagination/sorting via `QueryableExtensions`.
+- **`GetAuditEntries` / `GetAuditEntriesHandler`** — CQRS query request extending `PaginatedQuery` and returning `PaginatedResult<AuditEntry>`.
+- **`AuditController`** — Administrative endpoint at `api/v1/kernel/audit` protected by `[Authorize(Roles = Roles.System)]`.
+
+> **Convention:** All entity mutations across all DbContexts are automatically captured by `AuditLogSaveChangesInterceptor`. Query audit records via `IAuditLogService` or `GET /api/v1/kernel/audit` (requires `System` role).
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

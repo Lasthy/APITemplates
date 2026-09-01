@@ -1,6 +1,10 @@
+using Kernel.AuditLog;
+using Kernel.AuditLog.Controllers;
+using Kernel.AuditLog.Features;
 using Kernel.Authorization;
 using Kernel.Authorization.Extensions;
 using Kernel.Boxing;
+using Kernel.Common;
 using Kernel.Configuration;
 using Kernel.Configuration.Controllers;
 using Kernel.Configuration.Features;
@@ -72,6 +76,9 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IHealthService, HealthService>();
         builder.Services.AddScoped<MemoryHealthCheck>();
 
+        // ── Audit Log infrastructure ──────────────────────────────────────────
+        builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
         // ── Dynamic Settings ──────────────────────────────────────────────────
         var environment = builder.Environment.EnvironmentName;
         var jsonSerializer = new JsonSerializer();
@@ -135,7 +142,7 @@ public static class WebApplicationBuilderExtensions
             options.SerializerOptions.Converters.Add(new Cysharp.Serialization.Json.UlidJsonConverter());
         });
 
-        // ── Configuration & Health Features ───────────────────────────────────
+        // ── Configuration, Health & Audit Features ────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
         builder.Services.AddTransient<ValidationInterceptor>();
         builder.Services.AddTransient<LoggingInterceptor>();
@@ -144,13 +151,16 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddScoped<IRequestHandler<UpdateSettings, bool>, UpdateSettingsHandler>();
         builder.Services.AddScoped<IRequestHandler<GetHealthReport, HealthReport>, GetHealthReportHandler>();
         builder.Services.AddScoped<IRequestHandler<GetModuleHealthReport, ModuleHealthReport>, GetModuleHealthReportHandler>();
+        builder.Services.AddScoped<IRequestHandler<GetAuditEntries, PaginatedResult<AuditEntry>>, GetAuditEntriesHandler>();
 
         // ── Persistence Interceptors ──────────────────────────────────────────
         builder.Services.AddScoped<ISaveChangesInterceptor, SoftDeleteSaveChangesInterceptor>();
         builder.Services.AddScoped<ISaveChangesInterceptor, AuditSaveChangesInterceptor>();
+        builder.Services.AddScoped<ISaveChangesInterceptor, AuditLogSaveChangesInterceptor>();
         builder.Services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsSaveChangesInterceptor>();
         builder.Services.AddScoped<SoftDeleteSaveChangesInterceptor>();
         builder.Services.AddScoped<AuditSaveChangesInterceptor>();
+        builder.Services.AddScoped<AuditLogSaveChangesInterceptor>();
         builder.Services.AddScoped<DispatchDomainEventsSaveChangesInterceptor>();
 
         // ── OpenAPI — kernel document ─────────────────────────────────────────
