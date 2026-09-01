@@ -13,6 +13,7 @@ Solution Root (Shopping.slnx)
 ├── Kernel/                  # Shared class library — all cross-cutting concerns & persistence
 │   ├── AuditLog/            # Structured audit logging (AuditEntry, SaveChanges interceptor, service, controller)
 │   ├── Authorization/       # Policy-based authorization (IAuthorizationPolicy, registry, interceptor, filters)
+│   ├── Caching/             # Caching abstraction (ICacheService, InMemoryCacheService, CacheAttribute, CacheInterceptor, CacheSettings)
 │   ├── Common/              # Result pattern (Result, Result<T>, PaginatedResult<T>)
 │   ├── Configuration/       # Dynamic settings system (DynamicSettingsSection, DynamicSettings, DataSettings)
 │   ├── Constants/           # Application-wide constants (Roles)
@@ -72,6 +73,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Messaging.json` | Dynamic settings for outbox messaging: processing interval, batch size, timeout, retry policy, cleanup retention. |
 | `appsettings.Email.json` | Dynamic settings for email delivery: SMTP host, port, credentials, SSL, From address/name. |
 | `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
+| `appsettings.Cache.json` | Dynamic settings for caching: enabled flag, default expiration seconds, global key prefix. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -298,7 +300,7 @@ Comprehensive HTTP and outbox observability infrastructure with correlation trac
 
 > **Convention:** All outbound outbox messages automatically capture the ambient request's correlation ID via `IMessageWriter`. Use `IScopeContext.CorrelationId` to correlate logs and operations across services.
 
-### Structured Audit Log (`Kernel/AuditLog/`)
+#### Structured Audit Log (`Kernel/AuditLog/`)
 A centralized, queryable audit trail capturing entity mutations with property-level diffs, user identity, and correlation tracking:
 
 - **`AuditAction`** — Enum: `Create`, `Update`, `Delete`.
@@ -310,6 +312,18 @@ A centralized, queryable audit trail capturing entity mutations with property-le
 - **`AuditController`** — Administrative endpoint at `api/v1/kernel/audit` protected by `[Authorize(Roles = Roles.System)]`.
 
 > **Convention:** All entity mutations across all DbContexts are automatically captured by `AuditLogSaveChangesInterceptor`. Query audit records via `IAuditLogService` or `GET /api/v1/kernel/audit` (requires `System` role).
+
+### Caching Abstraction (`Kernel/Caching/`)
+A centralized caching abstraction supporting in-memory storage, dynamic configuration, programmatic cache access, and automatic request pipeline response caching:
+
+- **`ICacheService`** — Abstraction for caching operations: `GetAsync<T>`, `SetAsync<T>`, `GetOrCreateAsync<T>`, `RemoveAsync`, `RemoveByPrefixAsync`.
+- **`InMemoryCacheService`** — Default in-memory implementation backed by ASP.NET Core's `IMemoryCache`. Features active key tracking with post-eviction callbacks for prefix-based invalidation (`RemoveByPrefixAsync`) and key-level concurrency synchronization to prevent cache stampedes.
+- **`CacheSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Cache"`). Loaded from `appsettings.Cache.json` (`Enabled`, `DefaultExpirationSeconds`, `KeyPrefix`).
+- **`[Cache]`** / **`CacheAttribute`** — Request interceptor attribute (`Order = -25`) for automatic handler response caching. Supports `DurationSeconds`, `KeyTemplate` (with `{Property}`, `{request.Property}`, `{userId}`, `{correlationId}` placeholders), `KeyPrefix`, and `VaryByUser`.
+- **`CacheInterceptor`** — Request pipeline interceptor that resolves key templates dynamically, short-circuits execution on cache hits, and auto-persists successful `Result<TResponse>` values.
+- **`AddCaching()`** — Registered automatically in `AddKernel()`.
+
+> **Convention:** Decorate read/query request handlers with `[Cache]` to cache responses. Inject `ICacheService` when programmatic cache manipulation or cache invalidation (`RemoveAsync`, `RemoveByPrefixAsync`) is needed.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

@@ -4,6 +4,8 @@ using Kernel.AuditLog.Features;
 using Kernel.Authorization;
 using Kernel.Authorization.Extensions;
 using Kernel.Boxing;
+using Kernel.Caching;
+using Kernel.Caching.Extensions;
 using Kernel.Common;
 using Kernel.Configuration;
 using Kernel.Configuration.Controllers;
@@ -104,12 +106,20 @@ public static class WebApplicationBuilderExtensions
         var emailSettings = new EmailSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(emailSettings);
 
+        var cacheSettings = new CacheSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(cacheSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
         builder.Services.AddSingleton(instanceSettings);
         builder.Services.AddSingleton(messagingSettings);
         builder.Services.AddSingleton(emailSettings);
+        builder.Services.AddSingleton(cacheSettings);
+
+        // ── Caching infrastructure ────────────────────────────────────────────
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 
         // ── Rate Limiting ─────────────────────────────────────────────────────
         builder.AddRateLimiting();
@@ -144,6 +154,7 @@ public static class WebApplicationBuilderExtensions
 
         // ── Configuration, Health & Audit Features ────────────────────────────
         builder.Services.AddScoped<IDispatcher, Dispatcher>();
+        builder.Services.AddTransient<CacheInterceptor>();
         builder.Services.AddTransient<ValidationInterceptor>();
         builder.Services.AddTransient<LoggingInterceptor>();
         builder.Services.AddTransient<TransactionInterceptor>();

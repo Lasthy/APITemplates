@@ -16,7 +16,7 @@
 | 5 | [Pagination & Filtering](#5--pagination--filtering) | ✅ Completed | `Kernel/Common/` |
 | 6 | [Observability / Diagnostics](#6--observability--diagnostics) | ✅ Completed | `Kernel/Diagnostics/` |
 | 7 | [Structured Audit Log](#7--structured-audit-log) | ✅ Completed | `Kernel/AuditLog/` |
-| 8 | [Caching Abstraction](#8--caching-abstraction) | 🟡 Medium | `Kernel/Caching/` |
+| 8 | [Caching Abstraction](#8--caching-abstraction) | ✅ Completed | `Kernel/Caching/` |
 | 9 | [Inbox / Idempotency](#9--inbox--idempotency) | 🟡 Medium | `Kernel/Messaging/` |
 | 10 | [Testing Utilities](#10--testing-utilities) | 🟡 Medium | `Kernel.Testing/` (new project) |
 | 11 | [Data Encryption](#11--data-encryption) | 🟢 Lower | `Kernel/Encryption/` |
@@ -802,9 +802,9 @@ public enum AuditAction { Create, Update, Delete }
 
 ---
 
-## 8. 🗄️ Caching Abstraction
+## 8. 🗄️ Caching Abstraction ✅
 
-**Priority:** 🟡 Medium  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Caching/`
 
 ### Motivation
@@ -1157,7 +1157,7 @@ public class ApiKey : IAuditable
 - [x] **#5 — Pagination & Filtering** (`PaginatedQuery` + `IQueryable` extensions + `PaginatedResult` improvements)
 - [x] **#6 — Observability** (correlation ID + request diagnostics middleware)
 - [x] **#7 — Structured Audit Log** (`AuditEntry` + SaveChanges interceptor + query endpoint)
-- [ ] **#8 — Caching** (`ICacheService` + in-memory default + `[Cache]` interceptor)
+- [x] **#8 — Caching** (`ICacheService` + in-memory default + `[Cache]` interceptor)
 - [ ] **#9 — Inbox / Idempotency** (`InboxEntry` + inbox check in `EventMessageProcessor`)
 - [ ] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
 - [ ] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter)
