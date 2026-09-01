@@ -18,6 +18,10 @@ var app = builder.Build();
 // Map the kernel OpenAPI JSON endpoint at /openapi/kernel.json.
 app.UseKernel();
 
+// Authentication and Authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Ensure databases and tables are created automatically on startup
 app.UseData();
 

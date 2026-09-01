@@ -42,6 +42,7 @@ public abstract class ModuleTestBase<TModule> : KernelTestBase where TModule : I
         services.RegisterValidatorsFromAssembly(assembly);
 
         // Register authorization policies from module assembly
+        services.AddAuthorization(options => TModule.RegisterPolicies(options));
         services.RegisterAuthorizationPoliciesFromAssembly(assembly);
 
         // Register health checks

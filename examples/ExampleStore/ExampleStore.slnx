@@ -2,4 +2,11 @@
   <Project Path="Host/Host.csproj" />
   <Project Path="Kernel/Kernel.csproj" />
   <Project Path="Kernel.Testing/Kernel.Testing.csproj" />
+  <Folder Name="/Modules/">
+    <Project Path="Modules/Identity/Identity.csproj" />
+    <Project Path="Modules/Identity.Contracts/Identity.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Identity.Tests/Identity.Tests.csproj" />
+  </Folder>
 </Solution>
