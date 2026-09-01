@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)GlobalUsings.Shared.cs" Link="GlobalUsings.Shared.cs" />
+  </ItemGroup>
+</Project>
