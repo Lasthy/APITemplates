@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using Kernel.Caching;
 using Kernel.Configuration;
 using Kernel.Email;
+using Kernel.Encryption;
 using Kernel.Events;
 using Kernel.Persistence;
 using Kernel.Testing.Fakes;
@@ -20,7 +21,7 @@ namespace Kernel.Testing.Infrastructure;
 
 /// <summary>
 /// Pre-configured <see cref="WebApplicationFactory{TProgram}"/> for full integration testing of the Host and its modules.
-/// Uses an isolated in-memory database and provides test fakes for EventBus, EmailSender, and Cache.
+/// Uses an isolated in-memory database and provides test fakes for EventBus, EmailSender, Cache, and Encryption.
 /// </summary>
 /// <typeparam name="TProgram">The entry point class of the host application (e.g. <c>Program</c>).</typeparam>
 public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgram>
@@ -48,13 +49,18 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
     /// </summary>
     public FakeCacheService CacheService { get; } = new();
 
+    /// <summary>
+    /// The test fake encryption service.
+    /// </summary>
+    public FakeEncryptionService EncryptionService { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
         builder.ConfigureServices(services =>
         {
-            // Replace EventBus, EmailSender, CacheService with test fakes
+            // Replace EventBus, EmailSender, CacheService, EncryptionService with test fakes
             services.RemoveAll<IEventBus>();
             services.AddSingleton<IEventBus>(EventBus);
             services.AddSingleton(EventBus);
@@ -66,6 +72,10 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
             services.RemoveAll<ICacheService>();
             services.AddSingleton<ICacheService>(CacheService);
             services.AddSingleton(CacheService);
+
+            services.RemoveAll<IEncryptionService>();
+            services.AddSingleton<IEncryptionService>(EncryptionService);
+            services.AddSingleton(EncryptionService);
 
             // Configure in-memory database in DataSettings
             var dynamicSettings = services

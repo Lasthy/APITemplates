@@ -28,6 +28,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Context/             # Scoped operation context (auth, claims)
 │   ├── Diagnostics/         # Observability & diagnostics (CorrelationId, RequestDiagnostics, ActivitySource)
 │   ├── Email/               # Email delivery abstraction (IEmailSender, SmtpEmailSender, EmailMessage, EmailSettings, template renderer)
+│   ├── Encryption/          # Column-level data encryption at rest (IEncryptionService, AesEncryptionService, [Encrypted], EncryptedValueConverter, EncryptionSettings)
 │   ├── Entities/            # Entity marker interfaces (audit, soft-delete, domain events)
 │   ├── Events/              # EventBus abstraction + in-process impl + registry
 │   ├── Extensions/          # WebApplicationBuilder extensions (AddKernel, AddData, UseKernel, UseData)
@@ -43,8 +44,8 @@ Solution Root (MyAPI.slnx)
 │   ├── Workers/             # BaseWorker background service
 │   └── ThirdParty/          # Third-party license files
 ├── Kernel.Testing/          # Testing companion library (fakes, base test fixtures, fluent assertions)
-│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions)
-│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService)
+│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions)
+│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService)
 │   └── Infrastructure/      # Base classes & web host factory (KernelTestBase, ModuleTestBase, TestWebApplicationFactory)
 ├── Modules/                 # Directory where module projects live
 │   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
@@ -86,6 +87,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Email.json` | Dynamic settings for email delivery: SMTP host, port, credentials, SSL, From address/name. |
 | `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 | `appsettings.Cache.json` | Dynamic settings for caching: enabled flag, default expiration seconds, global key prefix. |
+| `appsettings.Encryption.json` | Dynamic settings for data encryption: 256-bit AES key (Base64 or passphrase). |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -424,6 +426,18 @@ A modular health reporting system that groups health checks by module, calculate
 
 > **Convention:** Place module-specific health checks anywhere in your module assembly implementing `IHealthCheck`. The module registration (`AddModule<T>`) automatically discovers and registers all `IHealthCheck` implementations under the module name. Public health probes (`/live`, `/ready`) do not require authorization, whereas detailed reports (`/report`, `/report/{moduleName}`) require `Roles.System`.
 
+#### Data Encryption (`Kernel/Encryption/`)
+Column-level authenticated data encryption at rest using AES-256-GCM and transparent Entity Framework Core value converters:
+
+- **`IEncryptionService`** — Interface for encrypting/decrypting strings (Base64 encoded payload) and raw byte arrays.
+- **`AesEncryptionService`** — AES-256-GCM AEAD implementation. Automatically generates unique 12-byte random nonces per encryption, calculates 16-byte authentication tags to prevent tampering, and dynamically resolves keys from `EncryptionSettings`.
+- **`EncryptionSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Encryption"`). Loaded from `appsettings.Encryption.json`. Supports 32-byte Base64 keys and passphrase key derivation via SHA-256.
+- **`[Encrypted]`** / **`EncryptedAttribute`** — Property attribute used on entity string and byte[] properties to mark them for transparent encryption at rest.
+- **`EncryptedValueConverter`** / **`EncryptedBinaryValueConverter`** — EF Core `ValueConverter` implementations wrapping `IEncryptionService`.
+- **`modelBuilder.UseEncryption(IEncryptionService)`** / **`modelBuilder.UseEncryption(DbContext)`** — Extension methods configuring EF Core entity models for transparent encryption of properties marked with `[Encrypted]`.
+
+> **Convention:** Decorate sensitive entity properties (tokens, credentials, secrets) with `[Encrypted]` and call `modelBuilder.UseEncryption(this)` or `modelBuilder.UseEncryption(encryptionService)` in `OnModelCreating`. Inject `IEncryptionService` when explicit manual data encryption/decryption is required.
+
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
 
@@ -431,6 +445,7 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`FakeScopeContext`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IScopeContext` with a fluent setup API (`AsAnonymous()`, `AsAuthenticated(userId, roles)`, `AsSystem()`, `WithRole()`, `WithClaim()`, `WithCorrelationId()`, `Reset()`).
 - **`FakeEmailSender`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEmailSender`. Records sent messages (`SentMessages`, `LastSentMessage`, `SentCount`, `HasSent`, `GetSentTo`) and allows simulating errors via `ShouldSucceed` and `FailureError`.
 - **`FakeCacheService`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `ICacheService`. Supports inspecting keys, values, and expiration without external Redis or memory cache dependencies.
+- **`FakeEncryptionService`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEncryptionService`. Supports transparent prefix transformation or real AES mode, failure simulation, and tracks all encryption/decryption operations.
 - **`ResultAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertion extensions:
   - `result.ShouldBeSuccess()` — Asserts success, returns `Value` for `Result<T>`.
   - `result.ShouldBeFailure()` / `result.ShouldBeFailure<TException>()` — Asserts failure and error exception type.
@@ -439,9 +454,10 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`EventBusAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHavePublished<T>()`, `ShouldHavePublished<T>(predicate)`, `ShouldHavePublished<T>(count)`, `ShouldNotHavePublished<T>()`, `ShouldBeEmpty()`.
 - **`EmailSenderAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSent()`, `ShouldHaveSent(predicate)`, `ShouldHaveSentTo(email)`, `ShouldHaveSentCount(count)`, `ShouldNotHaveSent()`.
 - **`CacheAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldContainKey(key)`, `ShouldContain<T>(key, expectedValue)`, `ShouldNotContainKey(key)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
-- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
+- **`EncryptionAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveEncrypted(plaintext)`, `ShouldHaveDecrypted(ciphertext)`, `ShouldHaveEncryptedCount(count)`, `ShouldHaveDecryptedCount(count)`, `ShouldBeEmpty()`.
+- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
 - **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
-- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, and `CacheService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
+- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, and `EncryptionService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
 
 > **Convention:** In test projects, reference `Kernel.Testing.csproj`. For unit/handler tests of a module, inherit from `ModuleTestBase<MyModule, MyDbContext>`. Use `Dispatcher.DispatchAsync(request)`, configure identity with `ScopeContext.AsSystem()` or `ScopeContext.AsAuthenticated()`, assert outcomes with `.ShouldBeSuccess()`, and assert event publications with `EventBus.ShouldHavePublished<MyEvent>()`. For full HTTP endpoint integration tests, use `TestWebApplicationFactory<Program>`.
 

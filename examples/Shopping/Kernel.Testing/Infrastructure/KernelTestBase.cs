@@ -8,6 +8,8 @@ using Kernel.Configuration;
 using Kernel.Configuration.Features;
 using Kernel.Context;
 using Kernel.Email;
+using Kernel.Encryption;
+using Kernel.Encryption.Extensions;
 using Kernel.Events;
 using Kernel.Health;
 using Kernel.Health.Checks;
@@ -67,6 +69,11 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
     public FakeCacheService CacheService { get; } = new();
 
     /// <summary>
+    /// The test fake encryption service.
+    /// </summary>
+    public FakeEncryptionService EncryptionService { get; } = new();
+
+    /// <summary>
     /// The centralized JSON serializer.
     /// </summary>
     public IJsonSerializer JsonSerializer { get; } = new JsonSerializer();
@@ -108,6 +115,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         var messagingSettings = new MessagingSettings(JsonSerializer, "Testing") { AutoSave = false };
         var emailSettings = new EmailSettings(JsonSerializer, "Testing") { AutoSave = false };
         var cacheSettings = new CacheSettings(JsonSerializer, "Testing") { AutoSave = false };
+        var encryptionSettings = new EncryptionSettings(JsonSerializer, "Testing") { AutoSave = false };
         var dataSettings = new DataSettings(JsonSerializer, "Testing") { AutoSave = false };
         dataSettings.SetValue("Provider", "InMemory");
         dataSettings.SetValue("ConnectionString", DatabaseName);
@@ -118,6 +126,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         DynamicSettings.AddSection(messagingSettings);
         DynamicSettings.AddSection(emailSettings);
         DynamicSettings.AddSection(cacheSettings);
+        DynamicSettings.AddSection(encryptionSettings);
         DynamicSettings.AddSection(dataSettings);
 
         var configBuilder = new ConfigurationBuilder();
@@ -152,6 +161,9 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(CacheService);
         services.AddSingleton<ICacheService>(CacheService);
 
+        services.AddSingleton(EncryptionService);
+        services.AddSingleton<IEncryptionService>(EncryptionService);
+
         // ── Dynamic Settings & Configuration ──────────────────────────────────
         services.AddSingleton<IConfiguration>(Configuration);
         services.AddSingleton(DynamicSettings);
@@ -161,6 +173,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(DynamicSettings.GetSection<MessagingSettings>());
         services.AddSingleton(DynamicSettings.GetSection<EmailSettings>());
         services.AddSingleton(DynamicSettings.GetSection<CacheSettings>());
+        services.AddSingleton(DynamicSettings.GetSection<EncryptionSettings>());
         services.AddSingleton(DynamicSettings.GetSection<DataSettings>());
 
         // ── Partition Manager ─────────────────────────────────────────────────

@@ -19,7 +19,7 @@
 | 8 | [Caching Abstraction](#8--caching-abstraction) | ✅ Completed | `Kernel/Caching/` |
 | 9 | [Inbox / Idempotency](#9--inbox--idempotency) | ✅ Completed | `Kernel/Messaging/` |
 | 10 | [Testing Utilities](#10--testing-utilities) | ✅ Completed | `Kernel.Testing/` (new project) |
-| 11 | [Data Encryption](#11--data-encryption) | 🟢 Lower | `Kernel/Encryption/` |
+| 11 | [Data Encryption](#11--data-encryption) | ✅ Completed | `Kernel/Encryption/` |
 | 12 | [API Versioning](#12--api-versioning) | 🟢 Lower | `Kernel/Versioning/` |
 | 13 | [File Storage](#13--file-storage) | 🟢 Lower | `Kernel/Storage/` |
 | 14 | [Real-Time Notifications](#14--real-time-notifications) | 🟢 Lower | `Kernel/Notifications/` |
@@ -937,9 +937,9 @@ public class UserTests : ModuleTestBase<IdentityModule>
 
 ---
 
-## 11. 🔒 Data Encryption
+## 11. 🔒 Data Encryption ✅
 
-**Priority:** 🟢 Lower  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Encryption/`
 
 ### Motivation
@@ -1159,8 +1159,8 @@ public class ApiKey : IAuditable
 - [x] **#7 — Structured Audit Log** (`AuditEntry` + SaveChanges interceptor + query endpoint)
 - [x] **#8 — Caching** (`ICacheService` + in-memory default + `[Cache]` interceptor)
 - [x] **#9 — Inbox / Idempotency** (`InboxEntry` + inbox check in `EventMessageProcessor`)
-- [ ] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
-- [ ] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter)
+- [x] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
+- [x] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter + `AesEncryptionService`)
 - [ ] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
 - [ ] **#13 — File Storage** (`IFileStorage` + local filesystem default)
 - [ ] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)

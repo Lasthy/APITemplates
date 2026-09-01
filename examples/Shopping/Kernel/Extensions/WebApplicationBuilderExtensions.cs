@@ -14,6 +14,8 @@ using Kernel.Context;
 using Kernel.Diagnostics;
 using Kernel.Diagnostics.Extensions;
 using Kernel.Email;
+using Kernel.Encryption;
+using Kernel.Encryption.Extensions;
 using Kernel.Events;
 using Kernel.Health;
 using Kernel.Health.Checks;
@@ -109,6 +111,9 @@ public static class WebApplicationBuilderExtensions
         var cacheSettings = new CacheSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(cacheSettings);
 
+        var encryptionSettings = new EncryptionSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(encryptionSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
@@ -116,10 +121,14 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(messagingSettings);
         builder.Services.AddSingleton(emailSettings);
         builder.Services.AddSingleton(cacheSettings);
+        builder.Services.AddSingleton(encryptionSettings);
 
         // ── Caching infrastructure ────────────────────────────────────────────
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+
+        // ── Encryption infrastructure ─────────────────────────────────────────
+        builder.Services.AddSingleton<IEncryptionService, AesEncryptionService>();
 
         // ── Rate Limiting ─────────────────────────────────────────────────────
         builder.AddRateLimiting();
