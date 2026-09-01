@@ -14,4 +14,14 @@ public static class IdentityClaimTypes
     /// Claim type indicating whether the user is a dummy account.
     /// </summary>
     public const string IsDummy = "is_dummy";
+
+    /// <summary>
+    /// Claim type for the ID of the API key used to authenticate.
+    /// </summary>
+    public const string ApiKeyId = "apikey_id";
+
+    /// <summary>
+    /// Claim type for the name/label of the API key used to authenticate.
+    /// </summary>
+    public const string ApiKeyName = "apikey_name";
 }

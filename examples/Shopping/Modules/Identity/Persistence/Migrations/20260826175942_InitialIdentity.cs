@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -194,6 +194,34 @@ namespace Identity.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ApiKeys",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "TEXT", maxLength: 26, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    KeyHash = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    KeyPrefix = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
+                    UserId = table.Column<string>(type: "TEXT", maxLength: 26, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    RevokedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    LastUsedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    CreatedBy = table.Column<string>(type: "TEXT", maxLength: 26, nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "TEXT", maxLength: 26, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiKeys", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiKeys_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RefreshTokens",
                 columns: table => new
                 {
@@ -270,6 +298,17 @@ namespace Identity.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_KeyHash",
+                table: "ApiKeys",
+                column: "KeyHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_UserId",
+                table: "ApiKeys",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_Token",
                 table: "RefreshTokens",
                 column: "Token",
@@ -301,6 +340,9 @@ namespace Identity.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "Clients");
+
+            migrationBuilder.DropTable(
+                name: "ApiKeys");
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");

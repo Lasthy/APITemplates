@@ -148,6 +148,16 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
     }
 
     /// <summary>
+    /// Creates an <see cref="HttpClient"/> configured with an API key header.
+    /// </summary>
+    public HttpClient CreateApiKeyClient(string apiKey, string headerName = "X-API-Key")
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add(headerName, apiKey);
+        return client;
+    }
+
+    /// <summary>
     /// Executes an asynchronous delegate inside a fresh DI scope.
     /// </summary>
     public async Task ExecuteScopeAsync(Func<IServiceProvider, Task> action)

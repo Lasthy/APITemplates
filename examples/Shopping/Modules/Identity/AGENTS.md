@@ -13,20 +13,25 @@ Modules/
 │   │   └── IdentitySettings.cs                   # DynamicSettingsSection: JWT, cookie, seeding config
 │   ├── Controllers/
 │   │   ├── AuthController.cs                     # Login, refresh, logout, me
+│   │   ├── ApiKeysController.cs                  # Create, list, get, revoke API keys
 │   │   ├── UsersController.cs                    # Register, CRUD, ban/unban, preferences, dummy
 │   │   └── ProfilesController.cs                 # List/detail profiles
 │   ├── Entities/
 │   │   ├── ApplicationUser.cs                    # IdentityUser<DefaultId> + profile, preferences, ban, dummy
 │   │   ├── ApplicationRole.cs                    # IdentityRole<DefaultId>
+│   │   ├── ApiKey.cs                             # ApiKey entity with SHA-256 hash storage
 │   │   └── RefreshToken.cs                       # Refresh token entity with rotation
 │   ├── Features/
 │   │   ├── Auth/                                 # Login, RefreshToken, Logout, GetCurrentUser, ChangePassword, ForgotPassword, ResetPassword
+│   │   ├── ApiKeys/                              # CreateApiKey, RevokeApiKey, GetApiKeys, GetApiKeyById
 │   │   ├── Users/                                # CreateUser, GetUsers, GetUser, UpdateUser, Ban/Unban, Dummy, Preferences
 │   │   ├── Profiles/                             # GetProfiles, GetProfile
 │   │   ├── GetUserSummaryHandler.cs              # Cross-module handler for GetUserSummary
 │   │   └── ValidateUserAccessHandler.cs          # Cross-module handler for ValidateUserAccess
+│   ├── Authentication/
+│   │   └── ApiKeyAuthenticationHandler.cs        # Custom auth handler for X-API-Key scheme
 │   ├── Persistence/
-│   │   └── IdentityModuleDbContext.cs            # IdentityDbContext with Ulid converters
+│   │   └── IdentityModuleDbContext.cs            # IdentityDbContext with Ulid converters & ApiKeys DbSet
 │   ├── Profiles/
 │   │   ├── IProfile.cs                           # Profile contract (static abstract interface)
 │   │   ├── ProfileRegistry.cs                    # Singleton registry + ProfileDescriptor
@@ -36,17 +41,18 @@ Modules/
 │   │       └── SystemProfile.cs                  # Non-public system profile
 │   ├── Services/
 │   │   ├── ITokenService.cs / TokenService.cs    # JWT + refresh token generation
+│   │   ├── IApiKeyService.cs / ApiKeyService.cs  # API key generation, validation, revocation
 │   │   └── IUserService.cs / UserService.cs      # High-level user operations
 │   ├── Workers/
 │   │   └── RoleSeedWorker.cs                     # One-shot: seeds roles + optional admin user
-│   ├── IdentityModule.cs                         # IModule entry point
+│   ├── IdentityModule.cs                         # IModule entry point (registers PolicyScheme routing)
 │   ├── appsettings.Identity.json                 # Module settings (JWT config, seeding)
 │   └── appsettings.Identity.Development.json     # Dev overlay
 │
 └── Identity.Contracts/                           # Companion contracts
     ├── Constants/                                # IdentityRoles, IdentityPolicies, IdentityProfiles, IdentityClaimTypes
-    ├── Dtos/                                     # UserDto, UserDetailDto, AuthTokenDto, ProfileDto, ProfileDetailDto
-    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent, PasswordChangedEvent, PasswordResetRequestedEvent, PasswordResetCompletedEvent
+    ├── Dtos/                                     # UserDto, UserDetailDto, AuthTokenDto, ApiKeyDto, ApiKeyCreatedDto, ProfileDto, ProfileDetailDto
+    ├── Events/                                   # UserCreatedEvent, UserBannedEvent, UserUnbannedEvent, ApiKeyCreatedEvent, ApiKeyRevokedEvent, PasswordChangedEvent, PasswordResetRequestedEvent, PasswordResetCompletedEvent
     ├── Requests/                                 # GetUserSummary, ValidateUserAccess
     └── Identity.Contracts.csproj
 ```
@@ -94,6 +100,12 @@ All `IProfile` implementations in the Identity module assembly are auto-discover
 
 ## 2. Authentication Flow
 
+### Dual Scheme (JWT + API Key)
+
+The Identity module configures a default `PolicyScheme` (`IdentityAuth`) that automatically routes incoming requests:
+1. If the request contains an `X-API-Key` or `ApiKey` header, it routes to `ApiKeyAuthenticationHandler`.
+2. Otherwise, it routes to standard JWT Bearer authentication (or HttpOnly cookie).
+
 ### JWT + HttpOnly Cookie
 
 Login returns a JWT access token and refresh token in the JSON response body. If `EnableCookieAuth` is `true` in settings, the access token is also set as an `HttpOnly + Secure + SameSite=Strict` cookie.
@@ -107,6 +119,14 @@ The cookie is "read-only" from JavaScript's perspective (`HttpOnly` prevents cli
 ### Refresh Token Rotation
 
 On refresh, the old refresh token is revoked and a new one is issued. This prevents token replay attacks. The refresh token chain is tracked via `ReplacedByToken` for audit.
+
+### API Key Authentication
+
+Server-to-server integrations, CI/CD tools, and background processes can authenticate via API keys using the `X-API-Key: mwa_<hex>` header.
+- **Plaintext secret returned once:** Plaintext keys are prefixed with `mwa_` and returned only once upon creation.
+- **SHA-256 hashed storage:** The database only stores the cryptographic SHA-256 hash.
+- **Claims & Roles inheritance:** The resulting `ClaimsPrincipal` inherits all roles and claims of the owner user, with added `IdentityClaimTypes.ApiKeyId` and `IdentityClaimTypes.ApiKeyName`.
+- **Active validation:** Keys that are expired, revoked, or belonging to banned users are rejected automatically. Valid authentications update `LastUsedAt`.
 
 ### Host Integration
 
@@ -131,7 +151,17 @@ app.UseAuthorization();
 | `POST` | `/change-password` | Authenticated | Change current user password + revoke tokens |
 | `POST` | `/forgot-password` | Anonymous | Initiate password reset → reset token event |
 | `POST` | `/reset-password` | Anonymous | Token + new password → reset password |
-| `GET` | `/me` | Authenticated | Current user details |
+| `GET` | `/me` | Authenticated | Current user details (works with JWT or API Key) |
+
+### API Keys (`/api/v1/identity/api-keys`)
+
+| Verb | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/` | Authenticated | Create API key (returns plaintext secret once) |
+| `GET` | `/` | Authenticated | List API keys for current user (or filter by `userId` for System) |
+| `GET` | `/{id}` | Authenticated | Get API key metadata by ID |
+| `DELETE` | `/{id}` | Authenticated | Revoke API key |
+| `POST` | `/{id}/revoke` | Authenticated | Revoke API key |
 
 ### Users (`/api/v1/identity/users`)
 

@@ -23,6 +23,11 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     /// <summary>
+    /// API keys for programmatic / integration access.
+    /// </summary>
+    public DbSet<ApiKey> ApiKeys { get; set; } = null!;
+
+    /// <summary>
     /// Clients associated with client profile users.
     /// </summary>
     public DbSet<Client> Clients { get; set; } = null!;
@@ -126,6 +131,27 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
             entity.HasOne(e => e.User)
                 .WithOne(u => u.Client)
                 .HasForeignKey<Client>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ApiKey configuration
+        builder.Entity<ApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(26);
+            entity.Property(e => e.UserId).HasMaxLength(26);
+            entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.KeyHash).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.KeyPrefix).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.CreatedBy).HasMaxLength(26);
+            entity.Property(e => e.UpdatedBy).HasMaxLength(26);
+
+            entity.HasIndex(e => e.KeyHash).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

@@ -23,7 +23,7 @@
 | 12 | [API Versioning](#12--api-versioning) | ✅ Completed | `Kernel/Versioning/` |
 | 13 | [File Storage](#13--file-storage) | ✅ Completed | `Kernel/Storage/` |
 | 14 | [Real-Time Notifications](#14--real-time-notifications) | 🟢 Lower | `Kernel/Notifications/` |
-| 15 | [API Key Authentication](#15--api-key-authentication) | 🟢 Lower | `mwa-module-identity` |
+| 15 | [API Key Authentication](#15--api-key-authentication) | ✅ Completed | `mwa-module-identity` |
 
 ---
 
@@ -1093,9 +1093,9 @@ public interface INotificationService
 
 ---
 
-## 15. 🔑 API Key Authentication
+## 15. 🔑 API Key Authentication ✅
 
-**Priority:** 🟢 Lower  
+**Status:** ✅ Completed  
 **Location:** `mwa-module-identity`
 
 ### Motivation
@@ -1122,7 +1122,8 @@ Modules/Identity/
 ├── Features/ApiKeys/
 │   ├── CreateApiKey.cs            [NEW]
 │   ├── RevokeApiKey.cs            [NEW]
-│   └── GetApiKeys.cs             [NEW]
+│   ├── GetApiKeys.cs             [NEW]
+│   └── GetApiKeyById.cs          [NEW]
 
 Modules/Identity/Persistence/
 ├── IdentityModuleDbContext.cs     [MODIFY] — Add DbSet<ApiKey>
@@ -1168,4 +1169,4 @@ public class ApiKey : IAuditable
 - [x] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
 - [x] **#13 — File Storage** (`IFileStorage` + local filesystem default)
 - [x] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)
-- [ ] **#15 — API Key Auth** (`ApiKey` entity + auth handler + endpoints)
+- [x] **#15 — API Key Auth** (`ApiKey` entity + auth handler + endpoints)

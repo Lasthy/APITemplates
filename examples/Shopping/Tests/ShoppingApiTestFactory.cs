@@ -11,14 +11,7 @@ public class ShoppingApiTestFactory : WebApplicationFactory<Program>
 {
     public ShoppingApiTestFactory()
     {
-        try
-        {
-            if (File.Exists("kernel.db")) File.Delete("kernel.db");
-            if (File.Exists("identity.db")) File.Delete("identity.db");
-            if (File.Exists("catalog.db")) File.Delete("catalog.db");
-            if (File.Exists("orders.db")) File.Delete("orders.db");
-        }
-        catch { }
+        CleanupDbFiles();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -28,15 +21,16 @@ public class ShoppingApiTestFactory : WebApplicationFactory<Program>
 
     public async Task<string> LoginAsync(HttpClient client, string email, string password)
     {
-        if (!client.DefaultRequestHeaders.Contains("X-Forwarded-For"))
-        {
-            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", $"10.99.{Random.Shared.Next(1, 254)}.{Random.Shared.Next(1, 254)}");
-        }
+        client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", $"10.99.{Random.Shared.Next(1, 254)}.{Random.Shared.Next(1, 254)}");
 
         var retries = 10;
         HttpResponseMessage response = null!;
         while (retries-- > 0)
         {
+            client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", $"10.99.{Random.Shared.Next(1, 254)}.{Random.Shared.Next(1, 254)}");
+
             response = await client.PostAsJsonAsync("/api/v1/identity/auth/login", new
             {
                 Email = email,
@@ -61,12 +55,41 @@ public class ShoppingApiTestFactory : WebApplicationFactory<Program>
         return client;
     }
 
+    public HttpClient CreateApiKeyClient(string apiKey, string headerName = "X-API-Key")
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add(headerName, apiKey);
+        return client;
+    }
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+        CleanupDbFiles();
+    }
+
+    private static void CleanupDbFiles()
+    {
         try
         {
-            if (File.Exists("kernel.db")) File.Delete("kernel.db");
+            var locations = new[]
+            {
+                Directory.GetCurrentDirectory(),
+                AppContext.BaseDirectory,
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../Host")),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../Host"))
+            };
+
+            foreach (var loc in locations)
+            {
+                if (Directory.Exists(loc))
+                {
+                    foreach (var file in Directory.GetFiles(loc, "*.db"))
+                    {
+                        try { File.Delete(file); } catch { }
+                    }
+                }
+            }
         }
         catch { }
     }

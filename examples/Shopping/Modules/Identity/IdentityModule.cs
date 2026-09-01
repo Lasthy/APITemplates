@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using Identity.Authentication;
 using Identity.Configuration;
 using Identity.Contracts.Constants;
 using Identity.Controllers;
@@ -127,11 +128,23 @@ public class IdentityModule : IModule
             .AddEntityFrameworkStores<IdentityModuleDbContext>()
             .AddDefaultTokenProviders();
 
-        // ── JWT Authentication ────────────────────────────────────────────────
+        // ── Authentication (JWT + API Key) ──────────────────────────────────
         services.AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultAuthenticateScheme = "IdentityAuth";
+                options.DefaultChallengeScheme = "IdentityAuth";
+            })
+            .AddPolicyScheme("IdentityAuth", "JWT or API Key", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    if (context.Request.Headers.ContainsKey(ApiKeyAuthenticationOptions.DefaultScheme) ||
+                        context.Request.Headers.ContainsKey("X-API-Key"))
+                    {
+                        return ApiKeyAuthenticationOptions.DefaultScheme;
+                    }
+                    return JwtBearerDefaults.AuthenticationScheme;
+                };
             })
             .AddJwtBearer(options =>
             {
@@ -161,11 +174,14 @@ public class IdentityModule : IModule
                         return Task.CompletedTask;
                     }
                 };
-            });
+            })
+            .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+                ApiKeyAuthenticationOptions.DefaultScheme, options => { });
 
         // ── Module services ───────────────────────────────────────────────────
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IApiKeyService, ApiKeyService>();
 
         // ── Controllers ───────────────────────────────────────────────────────
         services.AddControllers().AddApplicationPart(typeof(AuthController).Assembly);

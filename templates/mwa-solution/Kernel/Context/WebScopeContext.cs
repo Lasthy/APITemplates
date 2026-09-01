@@ -14,13 +14,12 @@ public class WebScopeContext : IScopeContext
     private readonly IHttpContextAccessor? _httpContextAccessor;
     private readonly ClaimsPrincipal? _user;
     private readonly string? _explicitCorrelationId;
-    private IReadOnlyList<string>? _roles;
-    private IReadOnlyDictionary<string, string>? _claims;
+
+    protected ClaimsPrincipal? User => _httpContextAccessor?.HttpContext?.User ?? _user;
 
     public WebScopeContext(IHttpContextAccessor httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;
-        _user = httpContextAccessor.HttpContext?.User;
     }
 
     /// <summary>
@@ -47,8 +46,8 @@ public class WebScopeContext : IScopeContext
     {
         get
         {
-            var sub = _user?.FindFirstValue(ClaimTypes.NameIdentifier)
-                   ?? _user?.FindFirstValue("sub");
+            var sub = User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                   ?? User?.FindFirstValue("sub");
 
             return sub != null ? DefaultId.Parse(sub) : (DefaultId?)null;
         }
@@ -56,16 +55,16 @@ public class WebScopeContext : IScopeContext
 
     /// <summary>The display name of the authenticated user.</summary>
     public string? UserName =>
-        _user?.FindFirstValue(ClaimTypes.Name)
-        ?? _user?.FindFirstValue("name");
+        User?.FindFirstValue(ClaimTypes.Name)
+        ?? User?.FindFirstValue("name");
 
     /// <inheritdoc/>
     public bool IsAuthenticated =>
-        _user?.Identity?.IsAuthenticated ?? false;
+        User?.Identity?.IsAuthenticated ?? false;
 
     /// <inheritdoc/>
     public IReadOnlyList<string> Roles =>
-        _roles ??= _user?.FindAll(ClaimTypes.Role)
+        User?.FindAll(ClaimTypes.Role)
             .Select(c => c.Value)
             .ToList()
             .AsReadOnly()
@@ -73,7 +72,7 @@ public class WebScopeContext : IScopeContext
 
     /// <inheritdoc/>
     public IReadOnlyDictionary<string, string> Claims =>
-        _claims ??= _user?.Claims
+        User?.Claims
             .GroupBy(c => c.Type)
             .ToDictionary(g => g.Key, g => g.First().Value)
             .AsReadOnly()
@@ -81,11 +80,11 @@ public class WebScopeContext : IScopeContext
 
     /// <inheritdoc/>
     public string? GetClaim(string claimType) =>
-        _user?.FindFirstValue(claimType);
+        User?.FindFirstValue(claimType);
 
     /// <inheritdoc/>
     public IReadOnlyList<string> GetClaimValues(string claimType) =>
-        _user?.FindAll(claimType)
+        User?.FindAll(claimType)
             .Select(c => c.Value)
             .ToList()
             .AsReadOnly()
@@ -93,7 +92,7 @@ public class WebScopeContext : IScopeContext
 
     /// <inheritdoc/>
     public bool IsInRole(string role) =>
-        _user?.IsInRole(role) ?? false;
+        User?.IsInRole(role) ?? false;
 
     /// <inheritdoc/>
     public bool IsSystem => IsInRole(Constants.Roles.System);
