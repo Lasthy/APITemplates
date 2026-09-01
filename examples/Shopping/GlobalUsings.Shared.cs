@@ -1,1 +1,0 @@
-global using DefaultId = System.Ulid;
