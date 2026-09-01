@@ -34,6 +34,10 @@ Solution Root (MyAPI.slnx)
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
+├── Kernel.Testing/          # Testing companion library (fakes, base test fixtures, fluent assertions)
+│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions)
+│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService)
+│   └── Infrastructure/      # Base classes & web host factory (KernelTestBase, ModuleTestBase, TestWebApplicationFactory)
 ├── Modules/                 # Directory where module projects live
 │   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
 │   └── {ModuleName}.Contracts/ # Companion public contracts (events, requests, DTOs)
@@ -326,6 +330,27 @@ A centralized caching abstraction supporting in-memory storage, dynamic configur
 - **`AddCaching()`** — Registered automatically in `AddKernel()`.
 
 > **Convention:** Decorate read/query request handlers with `[Cache]` to cache responses. Inject `ICacheService` when programmatic cache manipulation or cache invalidation (`RemoveAsync`, `RemoveByPrefixAsync`) is needed.
+
+#### Testing Utilities (`Kernel.Testing/`)
+A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
+
+- **`FakeEventBus`** (`Kernel.Testing/Fakes/`) — Thread-safe test fake implementing `IEventBus`. Captures published events in chronological order, provides querying (`GetPublishedEvents<T>`, `GetLastPublishedEvent<T>`, `HasPublished<T>`, `CountPublished<T>`), and supports assertion helpers.
+- **`FakeScopeContext`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IScopeContext` with a fluent setup API (`AsAnonymous()`, `AsAuthenticated(userId, roles)`, `AsSystem()`, `WithRole()`, `WithClaim()`, `WithCorrelationId()`, `Reset()`).
+- **`FakeEmailSender`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEmailSender`. Records sent messages (`SentMessages`, `LastSentMessage`, `SentCount`, `HasSent`, `GetSentTo`) and allows simulating errors via `ShouldSucceed` and `FailureError`.
+- **`FakeCacheService`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `ICacheService`. Supports inspecting keys, values, and expiration without external Redis or memory cache dependencies.
+- **`ResultAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertion extensions:
+  - `result.ShouldBeSuccess()` — Asserts success, returns `Value` for `Result<T>`.
+  - `result.ShouldBeFailure()` / `result.ShouldBeFailure<TException>()` — Asserts failure and error exception type.
+  - `result.ShouldHaveValidationError(field)` — Asserts `ValidationException` and error on specific field.
+  - `result.ShouldHavePage(page, pageSize, totalCount)` — Asserts pagination metadata on `PaginatedResult<T>`.
+- **`EventBusAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHavePublished<T>()`, `ShouldHavePublished<T>(predicate)`, `ShouldHavePublished<T>(count)`, `ShouldNotHavePublished<T>()`, `ShouldBeEmpty()`.
+- **`EmailSenderAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSent()`, `ShouldHaveSent(predicate)`, `ShouldHaveSentTo(email)`, `ShouldHaveSentCount(count)`, `ShouldNotHaveSent()`.
+- **`CacheAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldContainKey(key)`, `ShouldContain<T>(key, expectedValue)`, `ShouldNotContainKey(key)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
+- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
+- **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
+- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, and `CacheService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
+
+> **Convention:** In test projects, reference `Kernel.Testing.csproj`. For unit/handler tests of a module, inherit from `ModuleTestBase<MyModule, MyDbContext>`. Use `Dispatcher.DispatchAsync(request)`, configure identity with `ScopeContext.AsSystem()` or `ScopeContext.AsAuthenticated()`, assert outcomes with `.ShouldBeSuccess()`, and assert event publications with `EventBus.ShouldHavePublished<MyEvent>()`. For full HTTP endpoint integration tests, use `TestWebApplicationFactory<Program>`.
 
 ### Module Scaffolding
 Use the helper scripts from the solution root:

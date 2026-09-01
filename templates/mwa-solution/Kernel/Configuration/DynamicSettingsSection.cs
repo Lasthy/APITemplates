@@ -32,6 +32,13 @@ public abstract class DynamicSettingsSection
 	public bool IsReadonly { get; set; }
 
 	/// <summary>
+	/// Controls whether <see cref="SetValue"/> automatically persists changes to the file on disk.
+	/// Defaults to <c>true</c>. Set to <c>false</c> in in-memory test environments to avoid file contention.
+	/// </summary>
+	[JsonIgnore]
+	public bool AutoSave { get; set; } = true;
+
+	/// <summary>
 	/// <c>true</c> when at least one value has been changed via <see cref="SetValue"/>
 	/// since the last <see cref="Save"/> (or since construction).
 	/// </summary>
@@ -179,7 +186,10 @@ public abstract class DynamicSettingsSection
 		HasPendingChanges = true;
 
 		// Auto-persist to the base file
-		Save();
+		if (AutoSave)
+		{
+			Save();
+		}
 
 		OnSettingsChanged?.Invoke(this, key);
 	}

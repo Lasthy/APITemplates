@@ -9,5 +9,6 @@
   </Folder>
   <Project Path="Host/Host.csproj" />
   <Project Path="Kernel/Kernel.csproj" />
+  <Project Path="Kernel.Testing/Kernel.Testing.csproj" />
   <Project Path="Tests/Shopping.Tests.csproj" />
 </Solution>

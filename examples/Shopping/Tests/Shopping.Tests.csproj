@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="../Host/Host.csproj" />
     <ProjectReference Include="../Kernel/Kernel.csproj" />
+    <ProjectReference Include="../Kernel.Testing/Kernel.Testing.csproj" />
     <ProjectReference Include="../Modules/Identity/Identity.csproj" />
     <ProjectReference Include="../Modules/Catalog/Catalog.csproj" />
     <ProjectReference Include="../Modules/Orders/Orders.csproj" />
