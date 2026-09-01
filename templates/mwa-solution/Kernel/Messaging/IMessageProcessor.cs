@@ -1,6 +1,6 @@
 using Kernel.Common;
 
-namespace Kernel.Boxing;
+namespace Kernel.Messaging;
 
 /// <summary>
 /// Processes a message of a certain channel.

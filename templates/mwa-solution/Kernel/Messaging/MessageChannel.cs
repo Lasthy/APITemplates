@@ -1,4 +1,4 @@
-namespace Kernel.Boxing;
+namespace Kernel.Messaging;
 
 /// <summary>
 /// Channels that messages can belong to.

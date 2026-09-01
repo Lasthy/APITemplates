@@ -1,7 +1,6 @@
 using Kernel.AuditLog;
 using Kernel.AuditLog.Features;
 using Kernel.Authorization.Extensions;
-using Kernel.Boxing;
 using Kernel.Caching;
 using Kernel.Common;
 using Kernel.Configuration;

@@ -1,5 +1,4 @@
 using Kernel.AuditLog;
-using Kernel.Boxing;
 using Kernel.Messaging;
 using Kernel.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;

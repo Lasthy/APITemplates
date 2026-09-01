@@ -14,5 +14,21 @@
   "tags": {
     "language": "C#",
     "type": "project"
-  }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/[Bb]in/**",
+            "**/[Oo]bj/**",
+            ".vs/**",
+            "**/*.user",
+            "**/*.lock.json",
+            ".git/**"
+          ]
+        }
+      ]
+    }
+  ]
 }

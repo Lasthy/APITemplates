@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kernel.Modules;
 
-
 /// <summary>
 /// Contract that every module must implement.
 /// Responsible for registering services and HTTP endpoints for the module.
@@ -38,4 +37,11 @@ public interface IModule
     /// Called during <c>app.UseModules()</c> after the host is built.
     /// </summary>
     static abstract void MapEndpoints(IEndpointRouteBuilder app);
+
+    /// <summary>
+    /// Optional startup hook executed during application startup after databases are initialized.
+    /// Use this for module-specific startup initialization (e.g., initial data seeding).
+    /// </summary>
+    /// <param name="serviceProvider">The root service provider.</param>
+    static virtual void OnStartup(IServiceProvider serviceProvider) { }
 }

@@ -93,11 +93,7 @@ public class IdentityModule : IModule
         // ── Database context ──────────────────────────────────────────────────
         services.AddDbContext<IdentityModuleDbContext>((sp, options) =>
         {
-            var ds = sp.GetService<DynamicSettings>();
-            DataSettings? dataSettings = null;
-            try { dataSettings = ds?.GetSection<DataSettings>(); } catch { }
-            dataSettings ??= sp.GetService<DataSettings>();
-
+            var dataSettings = sp.GetService<DataSettings>();
             if (dataSettings != null)
             {
                 options.UseConfiguredDatabase(dataSettings.Provider, dataSettings.ConnectionString, "identity");

@@ -1,6 +1,7 @@
 using Kernel.Authorization.Extensions;
 using Kernel.Configuration;
 using Kernel.Events;
+using Kernel.Extensions;
 using Kernel.Health;
 using Kernel.Json;
 using Kernel.Requests;
@@ -16,7 +17,7 @@ namespace Kernel.Modules;
 /// Extension methods for registering and configuring modules on the
 /// <see cref="WebApplicationBuilder"/> and <see cref="WebApplication"/>.
 /// </summary>
-public static class WebApplicationBuilderExtension
+public static class WebApplicationBuilderExtensions
 {
     /// <summary>
     /// Discovers and registers all active modules from <c>appsettings.Instance.json</c>.
@@ -28,11 +29,7 @@ public static class WebApplicationBuilderExtension
     /// </exception>
     public static void AddModules(this WebApplicationBuilder builder)
     {
-        var dynamicSettings = builder.Services
-            .Where(d => d.ServiceType == typeof(DynamicSettings))
-            .Select(d => d.ImplementationInstance as DynamicSettings)
-            .FirstOrDefault();
-
+        var dynamicSettings = builder.Services.GetRegisteredSingleton<DynamicSettings>();
         if (dynamicSettings == null)
         {
             throw new ApplicationException("DynamicSettings not found in DI. Did you call AddKernel() before AddModules()?");
@@ -48,7 +45,7 @@ public static class WebApplicationBuilderExtension
         }
 
         var modules = instanceSettings.ActiveModules;
-        var addModuleMethod = typeof(WebApplicationBuilderExtension)
+        var addModuleMethod = typeof(WebApplicationBuilderExtensions)
             .GetMethod(nameof(AddModule), BindingFlags.Public | BindingFlags.Static)!;
 
         foreach (var (moduleName, isActive) in modules)
@@ -83,11 +80,7 @@ public static class WebApplicationBuilderExtension
         }
 
         // Register all DbContext types found in service descriptors into DbContextTypeRegistry if present
-        var dbContextRegistry = builder.Services
-            .Where(d => d.ServiceType == typeof(Kernel.Persistence.DbContextTypeRegistry))
-            .Select(d => d.ImplementationInstance as Kernel.Persistence.DbContextTypeRegistry)
-            .FirstOrDefault();
-
+        var dbContextRegistry = builder.Services.GetRegisteredSingleton<Kernel.Persistence.DbContextTypeRegistry>();
         if (dbContextRegistry != null)
         {
             var dbContextTypes = builder.Services
@@ -117,11 +110,7 @@ public static class WebApplicationBuilderExtension
     public static void AddModule<T>(this WebApplicationBuilder builder) where T : IModule
     {
         // Load module-specific settings
-        var dynamicSettings = builder.Services
-            .Where(d => d.ServiceType == typeof(DynamicSettings))
-            .Select(d => d.ImplementationInstance as DynamicSettings)
-            .FirstOrDefault();
-            
+        var dynamicSettings = builder.Services.GetRegisteredSingleton<DynamicSettings>();
         if (dynamicSettings != null)
         {
             var jsonSerializer = new JsonSerializer();
@@ -167,22 +156,14 @@ public static class WebApplicationBuilderExtension
         builder.Services.RegisterValidatorsFromAssembly(typeof(T).Assembly);
 
         // Discover and register all IHealthCheck implementations from the module's assembly.
-        var healthCheckRegistry = builder.Services
-            .Where(d => d.ServiceType == typeof(IHealthCheckRegistry))
-            .Select(d => d.ImplementationInstance as IHealthCheckRegistry)
-            .FirstOrDefault();
-
+        var healthCheckRegistry = builder.Services.GetRegisteredSingleton<IHealthCheckRegistry>();
         if (healthCheckRegistry != null)
         {
             RegisterHealthChecks(builder.Services, healthCheckRegistry, T.Name, typeof(T).Assembly);
         }
 
-        // Record in the ModuleRegistry for post-build MapEndpoints and event type wiring.
-        var registry = builder.Services
-            .Where(d => d.ServiceType == typeof(ModuleRegistry))
-            .Select(d => d.ImplementationInstance as ModuleRegistry)
-            .FirstOrDefault();
-
+        // Record in the ModuleRegistry for post-build MapEndpoints, event type wiring, and startup hooks.
+        var registry = builder.Services.GetRegisteredSingleton<ModuleRegistry>();
         if (registry == null)
         {
             throw new ApplicationException("ModuleRegistry not found in DI. Did you call AddKernel() before AddModules()?");
@@ -191,7 +172,8 @@ public static class WebApplicationBuilderExtension
         registry.Register(new ModuleDescriptor(
             Name: T.Name,
             Assembly: typeof(T).Assembly,
-            MapEndpoints: T.MapEndpoints));
+            MapEndpoints: T.MapEndpoints,
+            OnStartup: T.OnStartup));
     }
 
     /// <summary>
@@ -199,6 +181,7 @@ public static class WebApplicationBuilderExtension
     /// <list type="bullet">
     ///   <item>Registers event types from each module's assembly into <see cref="IEventTypeRegistry"/>.</item>
     ///   <item>Maps each module's <see cref="IModule.MapEndpoints"/> routes.</item>
+    ///   <item>Executes any module <see cref="IModule.OnStartup"/> hooks.</item>
     ///   <item>Exposes each module's OpenAPI document at <c>/openapi/{moduleName}.json</c>.</item>
     /// </list>
     /// Call this after <c>app.UseKernel()</c> in <c>Program.cs</c>.
@@ -215,6 +198,9 @@ public static class WebApplicationBuilderExtension
 
             // Map module endpoints.
             module.MapEndpoints(app);
+
+            // Execute module startup hook if defined
+            module.OnStartup?.Invoke(app.Services);
         }
     }
 

@@ -1,4 +1,3 @@
-using Kernel.Boxing;
 using Kernel.Configuration;
 using Kernel.Persistence;
 using Kernel.Workers;

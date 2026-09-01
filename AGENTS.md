@@ -253,9 +253,7 @@ A channel-based message persistence, partition-sharded background processing, in
   - **Stuck/Timeout Recovery**: Detects messages in `ProcessingAt` exceeding `ProcessingTimeoutSeconds` and marks them timed out for retry.
   - **Exponential Backoff**: Reschedules failed messages with exponential delay ($2^{\text{retry}-1} \times \text{InitialDelay}$, capped at `MaxRetryDelaySeconds`) until `MaxRetryAttempts`.
 - **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages and expired inbox entries older than `CleanupRetentionDays` (and optionally permanently failed messages).
-- **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
-
-> **Note:** The `Message` class and related types use `Kernel.Boxing` namespace, while `InboxEntry`, `IInbox`, and `Inbox` use `Kernel.Messaging`.
+- **`MessagingSettings`** — Dynamic settings loaded from `appsettings.Messaging.json`.
 
 #### Observability & Diagnostics (`Kernel/Diagnostics/`)
 Comprehensive HTTP and outbox observability infrastructure with correlation tracking, request duration metrics, and OpenTelemetry diagnostic activities.
@@ -788,7 +786,7 @@ Kernel → (no project references, only NuGet packages)
 | New API controller | `Kernel/{FeatureName}/Controllers/` or `Modules/{ModuleName}/Controllers/` |
 | New entity marker interface | `Kernel/Entities/` |
 | New EF interceptor | `Kernel/Persistence/` |
-| New message channel + processor | `Kernel/Messaging/` (namespace: `Kernel.Boxing`) |
+| New message channel + processor | `Kernel/Messaging/` |
 | New global type alias | `GlobalUsings.Shared.cs` |
 | New kernel DI registration | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`AddKernel`) |
 | New kernel pipeline step | `Kernel/Extensions/WebApplicationBuilderExtensions.cs` (`UseKernel`) |

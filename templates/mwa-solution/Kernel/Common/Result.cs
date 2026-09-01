@@ -71,7 +71,6 @@ public record Result
     /// </summary>
     public static Result<T> Failure<T>(Exception error, params string[] messages) => new(default, false, error, messages);
 
-	// Non-generic Result
     public TOut Match<TOut>(
         Func<TOut> onSuccess,
         Func<Exception, TOut> onFailure)
@@ -104,7 +103,7 @@ public record Result<T> : Result
     }
 
     /// <summary>
-    /// Transform the value inside a successful Result<T>.
+    /// Transform the value inside a successful Result&lt;T&gt;.
     /// </summary>
     public Result<TOut> Map<TOut>(
         Func<T, TOut> map)
@@ -127,7 +126,6 @@ public record Result<T> : Result
         return bind(Value!);
     }
 
-    // Synchronous
     public TOut Match<TOut>(
         Func<T, TOut> onSuccess,
         Func<Exception, TOut> onFailure)

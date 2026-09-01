@@ -5,7 +5,7 @@ using Kernel.Json;
 using Kernel.Partitioning;
 using Kernel.Persistence;
 
-namespace Kernel.Boxing;
+namespace Kernel.Messaging;
 
 /// <summary>
 /// The default IMessageWriter implementation.

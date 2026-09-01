@@ -1,4 +1,4 @@
-namespace Kernel.Boxing;
+namespace Kernel.Messaging;
 
 /// <summary>
 /// Represents a message persisted to the database to be processed later. It stores the type and the content, and also

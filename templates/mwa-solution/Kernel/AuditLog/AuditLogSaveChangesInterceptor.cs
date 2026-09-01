@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Kernel.Boxing;
+using Kernel.Messaging;
 using Kernel.Context;
 using Kernel.Json;
 using Kernel.Persistence;
@@ -7,8 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-
-using Kernel.Messaging;
 
 namespace Kernel.AuditLog;
 

@@ -1,5 +1,0 @@
-D:\Dev\APITemplates\templates\mwa-module-identity\Modules\Identity.Contracts\obj\Debug\net10.0\Identity.Contracts.GeneratedMSBuildEditorConfig.editorconfig
-D:\Dev\APITemplates\templates\mwa-module-identity\Modules\Identity.Contracts\obj\Debug\net10.0\Identity.Contracts.AssemblyInfoInputs.cache
-D:\Dev\APITemplates\templates\mwa-module-identity\Modules\Identity.Contracts\obj\Debug\net10.0\Identity.Contracts.AssemblyInfo.cs
-D:\Dev\APITemplates\templates\mwa-module-identity\Modules\Identity.Contracts\obj\Debug\net10.0\Identity.Contracts.csproj.CoreCompileInputs.cache
-D:\Dev\APITemplates\templates\mwa-module-identity\Modules\Identity.Contracts\obj\Debug\net10.0\Identity.Contracts.sourcelink.json

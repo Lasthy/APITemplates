@@ -26,7 +26,7 @@ Solution Root (MyAPI.slnx)
 │   ├── Extensions/          # WebApplicationBuilder extensions (AddKernel, AddData, UseKernel, UseData)
 │   ├── Health/              # Health check models + checks (MemoryHealthCheck, DatabaseHealthCheck)
 │   ├── Json/                # Centralized JSON serializer abstraction (IJsonSerializer)
-│   ├── Messaging/           # Outbox/Inbox message persistence + processing (Kernel.Boxing)
+│   ├── Messaging/           # Outbox/Inbox message persistence + processing
 │   ├── Modules/             # IModule contract + module registration infrastructure
 │   ├── Notifications/       # Real-time notifications abstraction (INotificationService, SignalRNotificationService, NotificationHub, NotificationSettings, extensions)
 │   ├── Partitioning/        # Partition management for multi-instance deployments

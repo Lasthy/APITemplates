@@ -1,6 +1,6 @@
 using Kernel.Common;
 
-namespace Kernel.Boxing;
+namespace Kernel.Messaging;
 
 /// <summary>
 /// Interface for operations related to writing to the Kernel Database messages table.
