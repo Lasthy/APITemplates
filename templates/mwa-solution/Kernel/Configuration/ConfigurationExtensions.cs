@@ -36,42 +36,71 @@ public static class ConfigurationExtensions
     /// </summary>
     public static DynamicSettings AddKernelDynamicSettings(this WebApplicationBuilder builder, IJsonSerializer jsonSerializer)
     {
-        var environment = builder.Environment.EnvironmentName;
-        var dynamicSettings = new DynamicSettings(jsonSerializer, environment);
+        var initialEnv = builder.Environment.EnvironmentName;
+
+        // Check environment variables first (highest priority)
+        var envVar = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? System.Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+            ?? System.Environment.GetEnvironmentVariable("Application__Environment")
+            ?? System.Environment.GetEnvironmentVariable("APPSETTINGS__Application__Environment")
+            ?? System.Environment.GetEnvironmentVariable("SETTINGS__Application__Environment");
+
+        string effectiveEnvironment;
+
+        if (!string.IsNullOrWhiteSpace(envVar))
+        {
+            effectiveEnvironment = envVar;
+        }
+        else if (!string.IsNullOrWhiteSpace(initialEnv) && !string.Equals(initialEnv, "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            effectiveEnvironment = initialEnv;
+        }
+        else
+        {
+            var appSettings = new ApplicationSettings(jsonSerializer, initialEnv);
+            effectiveEnvironment = !string.IsNullOrWhiteSpace(appSettings.Environment)
+                ? appSettings.Environment
+                : initialEnv;
+        }
+
+        // Update builder.Environment.EnvironmentName so ASP.NET Core host environment matches!
+        builder.Environment.EnvironmentName = effectiveEnvironment;
+
+        var dynamicSettings = new DynamicSettings(jsonSerializer, effectiveEnvironment);
 
         // Register DynamicSettings into ASP.NET Configuration pipeline
         ((IConfigurationBuilder)builder.Configuration).AddDynamicSettings(dynamicSettings);
 
         // Register root host settings (appsettings.json, appsettings.{Environment}.json)
-        var hostSettings = new HostSettings(jsonSerializer, environment);
+        var hostSettings = new HostSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(hostSettings);
 
         // Register core dynamic settings sections
-        var applicationSettings = new ApplicationSettings(jsonSerializer, environment);
+        var applicationSettings = new ApplicationSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(applicationSettings);
 
-        var instanceSettings = new InstanceSettings(jsonSerializer, environment);
+        var instanceSettings = new InstanceSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(instanceSettings);
 
-        var messagingSettings = new MessagingSettings(jsonSerializer, environment);
+        var messagingSettings = new MessagingSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(messagingSettings);
 
-        var emailSettings = new EmailSettings(jsonSerializer, environment);
+        var emailSettings = new EmailSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(emailSettings);
 
-        var cacheSettings = new CacheSettings(jsonSerializer, environment);
+        var cacheSettings = new CacheSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(cacheSettings);
 
-        var encryptionSettings = new EncryptionSettings(jsonSerializer, environment);
+        var encryptionSettings = new EncryptionSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(encryptionSettings);
 
-        var versioningSettings = new VersioningSettings(jsonSerializer, environment);
+        var versioningSettings = new VersioningSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(versioningSettings);
 
-        var fileStorageSettings = new FileStorageSettings(jsonSerializer, environment);
+        var fileStorageSettings = new FileStorageSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(fileStorageSettings);
 
-        var notificationSettings = new NotificationSettings(jsonSerializer, environment);
+        var notificationSettings = new NotificationSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(notificationSettings);
 
         // Register all sections as singletons in DI

@@ -108,14 +108,28 @@ public abstract class DynamicSettingsSection
 	}
 
 	/// <summary>
+	/// Sets the environment name and reloads base options, environment overlays, and environment variables.
+	/// </summary>
+	/// <param name="environment">The new environment name (e.g. <c>"Development"</c>, <c>"Production"</c>, <c>"Staging"</c>).</param>
+	public void SetEnvironment(string? environment)
+	{
+		EnvironmentName = environment;
+		Initialize();
+	}
+
+	/// <summary>
 	/// Re-initializes and reloads base options, environment overlays, and environment variables.
 	/// </summary>
 	public void Initialize()
 	{
 		var effectiveSection = SectionName;
 		Source = ResolveFilePath(Source, effectiveSection);
-		_baseOptions = LoadFile(Source);
+		if (!HasPendingChanges)
+		{
+			_baseOptions = LoadFile(Source);
+		}
 		_envOptions = [];
+		EnvironmentSource = null;
 		_envVarOptions = [];
 
 		// 1. Load environment JSON overlay if specified
@@ -242,6 +256,10 @@ public abstract class DynamicSettingsSection
 			var modulePath2 = Path.Combine(Directory.GetCurrentDirectory(), "..", "Modules", sectionName, path);
 			if (File.Exists(modulePath2))
 				return modulePath2;
+
+			var modulePath3 = Path.Combine(AppContext.BaseDirectory, "Modules", sectionName, path);
+			if (File.Exists(modulePath3))
+				return modulePath3;
 		}
 
 		return path;
@@ -288,6 +306,12 @@ public abstract class DynamicSettingsSection
 			else if (!string.IsNullOrEmpty(sectionPrefix) && key.StartsWith(sectionPrefix, StringComparison.OrdinalIgnoreCase))
 			{
 				settingKey = key[sectionPrefix.Length..];
+			}
+			else if (string.Equals(effectiveSection, "Application", StringComparison.OrdinalIgnoreCase) &&
+			         (string.Equals(key, "ASPNETCORE_ENVIRONMENT", StringComparison.OrdinalIgnoreCase) ||
+			          string.Equals(key, "DOTNET_ENVIRONMENT", StringComparison.OrdinalIgnoreCase)))
+			{
+				settingKey = "Environment";
 			}
 
 			if (string.IsNullOrWhiteSpace(settingKey))

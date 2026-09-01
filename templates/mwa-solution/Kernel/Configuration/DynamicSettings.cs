@@ -16,7 +16,7 @@ public class DynamicSettings
 {
 	private readonly Dictionary<string, DynamicSettingsSection> _settings = new(StringComparer.OrdinalIgnoreCase);
 	private readonly IJsonSerializer _jsonSerializer;
-	private readonly string? _environment;
+	private string? _environment;
 	private IEventBus? _eventBus;
 
 	/// <summary>
@@ -28,6 +28,11 @@ public class DynamicSettings
 	/// Raised whenever any setting value changes in any registered section.
 	/// </summary>
 	public event Action<DynamicSettingsSection, string>? OnSettingChanged;
+
+	/// <summary>
+	/// Raised whenever the active environment is updated.
+	/// </summary>
+	public event Action<string?>? OnEnvironmentChanged;
 
 	public DynamicSettings(IJsonSerializer jsonSerializer, string? environment = null)
 	{
@@ -83,6 +88,12 @@ public class DynamicSettings
 	/// </summary>
 	public T AddSection<T>(T instance) where T : DynamicSettingsSection
 	{
+		if (!string.IsNullOrEmpty(_environment) &&
+		    !string.Equals(instance.EnvironmentName, _environment, StringComparison.OrdinalIgnoreCase))
+		{
+			instance.SetEnvironment(_environment);
+		}
+
 		_settings[instance.SectionName] = instance;
 		WireChangeEvent(instance);
 		OnSectionAdded?.Invoke(instance);
@@ -116,12 +127,39 @@ public class DynamicSettings
 	/// </summary>
 	public string? Environment => _environment;
 
+	/// <summary>
+	/// Updates the active environment for DynamicSettings and all registered sections.
+	/// Causes all sections to reload their environment-specific overlays.
+	/// </summary>
+	public void SetEnvironment(string? environment)
+	{
+		if (string.Equals(_environment, environment, StringComparison.OrdinalIgnoreCase))
+			return;
+
+		_environment = environment;
+		foreach (var section in _settings.Values)
+		{
+			section.SetEnvironment(environment);
+		}
+
+		OnEnvironmentChanged?.Invoke(environment);
+	}
+
 	// ── Private helpers ───────────────────────────────────────────────────
 
 	private void WireChangeEvent(DynamicSettingsSection section)
 	{
 		section.OnSettingsChanged += (changedSection, key) =>
 		{
+			if (string.Equals(changedSection.SectionName, "Application", StringComparison.OrdinalIgnoreCase) &&
+			    string.Equals(key, "Environment", StringComparison.OrdinalIgnoreCase))
+			{
+				if (changedSection.TryGetValue<string>("Environment", out var newEnv) && !string.IsNullOrWhiteSpace(newEnv))
+				{
+					SetEnvironment(newEnv);
+				}
+			}
+
 			OnSettingChanged?.Invoke(changedSection, key);
 
 			if (_eventBus is not null)

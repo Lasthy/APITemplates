@@ -121,11 +121,12 @@ public static class WebApplicationBuilderExtensions
 
             // Fall back: if no custom section was found, create a generic one for the module
             var settingsPath = $"appsettings.{T.Name}.json";
+            var resolvedSettingsPath = DynamicSettingsSection.ResolveFilePath(settingsPath, T.Name);
             if (!dynamicSettings.GetSectionNames().Any(n =>
                     string.Equals(n, T.Name, StringComparison.OrdinalIgnoreCase)) &&
-                File.Exists(settingsPath))
+                File.Exists(resolvedSettingsPath))
             {
-                var moduleSettings = new GenericModuleSettings(T.Name, settingsPath, jsonSerializer, environment);
+                var moduleSettings = new GenericModuleSettings(T.Name, resolvedSettingsPath, jsonSerializer, environment);
                 dynamicSettings.AddSection(moduleSettings);
             }
         }

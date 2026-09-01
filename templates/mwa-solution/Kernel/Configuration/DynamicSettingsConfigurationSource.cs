@@ -36,6 +36,7 @@ public class DynamicSettingsConfigurationProvider : ConfigurationProvider
         _dynamicSettings = dynamicSettings;
         _dynamicSettings.OnSettingChanged += (section, key) => Reload();
         _dynamicSettings.OnSectionAdded += (section) => Reload();
+        _dynamicSettings.OnEnvironmentChanged += (env) => Reload();
     }
 
     public override void Load()
