@@ -25,6 +25,8 @@ using Kernel.Json;
 using Kernel.Messaging;
 using Kernel.Messaging.Workers;
 using Kernel.Modules;
+using Kernel.Notifications;
+using Kernel.Notifications.Extensions;
 using Kernel.Partitioning;
 using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
@@ -124,6 +126,9 @@ public static class WebApplicationBuilderExtensions
         var fileStorageSettings = new FileStorageSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(fileStorageSettings);
 
+        var notificationSettings = new NotificationSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(notificationSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
@@ -134,12 +139,16 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(encryptionSettings);
         builder.Services.AddSingleton(versioningSettings);
         builder.Services.AddSingleton(fileStorageSettings);
+        builder.Services.AddSingleton(notificationSettings);
 
         // ── API Versioning ────────────────────────────────────────────────────
         builder.AddKernelVersioning();
 
         // ── File Storage infrastructure ───────────────────────────────────────
         builder.Services.AddFileStorage();
+
+        // ── Real-Time Notifications infrastructure ────────────────────────────
+        builder.Services.AddNotifications();
 
         // ── Caching infrastructure ────────────────────────────────────────────
         builder.Services.AddMemoryCache();
@@ -279,6 +288,8 @@ public static class WebApplicationBuilderExtensions
         app.MapOpenApi();
 
         app.UseRateLimiting();
+
+        app.MapNotifications();
 
         app.MapControllers();
     }

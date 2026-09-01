@@ -28,6 +28,7 @@ Solution Root (Shopping.slnx)
 │   ├── Json/                # Centralized JSON serializer abstraction (IJsonSerializer)
 │   ├── Messaging/           # Outbox/Inbox message persistence + processing (Kernel.Boxing)
 │   ├── Modules/             # IModule contract + module registration infrastructure
+│   ├── Notifications/       # Real-time notifications abstraction (INotificationService, SignalRNotificationService, NotificationHub, NotificationSettings, extensions)
 │   ├── Partitioning/        # Partition management for multi-instance deployments
 │   ├── Persistence/         # IDbContext, IDbContextSchema, KernelDbContext, DbContextTypeRegistry + EF SaveChanges interceptors
 │   ├── RateLimiting/        # Dynamic, partition-based rate limiting (RateLimitingSettings, extensions)
@@ -38,8 +39,8 @@ Solution Root (Shopping.slnx)
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
 ├── Kernel.Testing/          # Testing companion library (fakes, base test fixtures, fluent assertions)
-│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions, ApiVersioningAssertions, FileStorageAssertions)
-│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService, FakeFileStorage)
+│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions, ApiVersioningAssertions, FileStorageAssertions, NotificationAssertions)
+│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService, FakeFileStorage, FakeNotificationService)
 │   └── Infrastructure/      # Base classes & web host factory (KernelTestBase, ModuleTestBase, TestWebApplicationFactory)
 ├── Modules/                 # Directory where module projects live
 │   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
@@ -84,6 +85,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Encryption.json` | Dynamic settings for data encryption: 256-bit AES key (Base64 or passphrase). |
 | `appsettings.Versioning.json` | Dynamic settings for API versioning: default version, headers, query param, url segment flags. |
 | `appsettings.Storage.json` | Dynamic settings for file storage: provider, base path, base URL, max size, allowed extensions. |
+| `appsettings.Notifications.json` | Dynamic settings for real-time notifications: enabled flag, hub route path. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -371,6 +373,23 @@ A unified file and blob storage subsystem with a local filesystem provider, runt
 
 > **Convention:** Inject `IFileStorage` into services or handlers needing file persistence. Use extension methods (`UploadTextAsync`, `DownloadBytesAsync`) for convenient serialization. In tests, use `fixture.FileStorage` and assert with `fixture.FileStorage.ShouldHaveFile(...)`.
 
+### Real-Time Notifications (`Kernel/Notifications/`)
+A real-time notification abstraction backed by ASP.NET Core SignalR, configurable via dynamic settings, targeting individual users, named groups, or all connected clients:
+
+- **`INotificationService`** — Abstraction for pushing real-time notifications:
+  - `SendToUserAsync(userId, channel, payload, ct)` — Pushes notification to a specific user across all active connections.
+  - `SendToGroupAsync(group, channel, payload, ct)` — Pushes notification to all connected clients in a named group.
+  - `SendToAllAsync(channel, payload, ct)` — Broadcasts notification to all connected clients.
+- **`SignalRNotificationService`** — Default SignalR implementation using `IHubContext<NotificationHub>`. Respects `NotificationSettings.Enabled` and invokes both generic `ReceiveNotification(channel, payload)` and named channel methods on clients.
+- **`NotificationHub`** — SignalR `Hub` implementation providing `JoinGroup(group)` and `LeaveGroup(group)` client methods along with connection lifecycle logging.
+- **`KernelUserIdProvider`** — `IUserIdProvider` implementation resolving user identifier from standard claims (`sub`, `ClaimTypes.NameIdentifier`, `ClaimTypes.Name`) aligned with `IScopeContext`.
+- **`NotificationSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Notifications"`). Loaded from `appsettings.Notifications.json` (`Enabled`, `Path`).
+- **`NotificationExtensions`** (`Kernel/Notifications/Extensions/`) — Extension methods `services.AddNotifications()` and `app.MapNotifications()`.
+- **`FakeNotificationService`** (`Kernel.Testing/Fakes/`) — In-memory test fake capturing sent notifications (`SentNotifications`, `GetSentToUser`, `GetSentToGroup`, `GetBroadcastNotifications`, `HasSentToUser`, `HasSentToGroup`, `HasSentBroadcast`, `Clear`).
+- **`NotificationAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `service.ShouldHaveSentToUser(userId)`, `service.ShouldHaveSentToGroup(group)`, `service.ShouldHaveSentBroadcast()`, `service.ShouldNotHaveSentNotifications()`, `service.ShouldHaveNotificationCount(count)`.
+
+> **Convention:** Inject `INotificationService` into event handlers, workers, or controllers to push real-time updates to users or groups. In tests, use `fixture.NotificationService` and assert with `fixture.NotificationService.ShouldHaveSentToUser(...)`.
+
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
 
@@ -380,6 +399,7 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`FakeCacheService`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `ICacheService`. Supports inspecting keys, values, and expiration without external Redis or memory cache dependencies.
 - **`FakeEncryptionService`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEncryptionService`. Supports transparent prefix transformation or real AES mode, failure simulation, and tracks all encryption/decryption operations.
 - **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `IFileStorage`. Tracks stored blobs, deleted paths, and call counts.
+- **`FakeNotificationService`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `INotificationService`. Tracks sent notifications by target (user, group, broadcast) and channel.
 - **`ResultAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertion extensions:
   - `result.ShouldBeSuccess()` — Asserts success, returns `Value` for `Result<T>`.
   - `result.ShouldBeFailure()` / `result.ShouldBeFailure<TException>()` — Asserts failure and error exception type.
@@ -391,9 +411,10 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`EncryptionAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveEncrypted(plaintext)`, `ShouldHaveDecrypted(ciphertext)`, `ShouldHaveEncryptedCount(count)`, `ShouldHaveDecryptedCount(count)`, `ShouldBeEmpty()`.
 - **`ApiVersioningAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSupportedApiVersions(versions)`, `ShouldHaveDeprecatedApiVersions(versions)`.
 - **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveFile(path)`, `ShouldHaveFile(path, bytes)`, `ShouldHaveFile(path, text)`, `ShouldNotHaveFile(path)`, `ShouldHaveDeleted(path)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
-- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
+- **`NotificationAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSentToUser(userId)`, `ShouldHaveSentToGroup(group)`, `ShouldHaveSentBroadcast()`, `ShouldNotHaveSentNotifications()`, `ShouldHaveNotificationCount(count)`.
+- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`, `NotificationService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
 - **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
-- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, `EncryptionService`, and `FileStorage`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
+- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`, and `NotificationService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
 
 > **Convention:** In test projects, reference `Kernel.Testing.csproj`. For unit/handler tests of a module, inherit from `ModuleTestBase<MyModule, MyDbContext>`. Use `Dispatcher.DispatchAsync(request)`, configure identity with `ScopeContext.AsSystem()` or `ScopeContext.AsAuthenticated()`, assert outcomes with `.ShouldBeSuccess()`, and assert event publications with `EventBus.ShouldHavePublished<MyEvent>()`. For full HTTP endpoint integration tests, use `TestWebApplicationFactory<Program>`.
 

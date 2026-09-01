@@ -16,6 +16,7 @@ using Kernel.Health.Checks;
 using Kernel.Health.Features;
 using Kernel.Json;
 using Kernel.Messaging;
+using Kernel.Notifications;
 using Kernel.Partitioning;
 using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
@@ -82,6 +83,11 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
     public FakeFileStorage FileStorage { get; } = new();
 
     /// <summary>
+    /// The test fake notification service.
+    /// </summary>
+    public FakeNotificationService NotificationService { get; } = new();
+
+    /// <summary>
     /// The centralized JSON serializer.
     /// </summary>
     public IJsonSerializer JsonSerializer { get; } = new JsonSerializer();
@@ -126,6 +132,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         var encryptionSettings = new EncryptionSettings(JsonSerializer, "Testing") { AutoSave = false };
         var versioningSettings = new VersioningSettings(JsonSerializer, "Testing") { AutoSave = false };
         var fileStorageSettings = new FileStorageSettings(JsonSerializer, "Testing") { AutoSave = false };
+        var notificationSettings = new NotificationSettings(JsonSerializer, "Testing") { AutoSave = false };
         var dataSettings = new DataSettings(JsonSerializer, "Testing") { AutoSave = false };
         dataSettings.SetValue("Provider", "InMemory");
         dataSettings.SetValue("ConnectionString", DatabaseName);
@@ -139,6 +146,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         DynamicSettings.AddSection(encryptionSettings);
         DynamicSettings.AddSection(versioningSettings);
         DynamicSettings.AddSection(fileStorageSettings);
+        DynamicSettings.AddSection(notificationSettings);
         DynamicSettings.AddSection(dataSettings);
 
         var configBuilder = new ConfigurationBuilder();
@@ -179,6 +187,9 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(FileStorage);
         services.AddSingleton<IFileStorage>(FileStorage);
 
+        services.AddSingleton(NotificationService);
+        services.AddSingleton<INotificationService>(NotificationService);
+
         // ── Dynamic Settings & Configuration ──────────────────────────────────
         services.AddSingleton<IConfiguration>(Configuration);
         services.AddSingleton(DynamicSettings);
@@ -191,6 +202,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(DynamicSettings.GetSection<EncryptionSettings>());
         services.AddSingleton(DynamicSettings.GetSection<VersioningSettings>());
         services.AddSingleton(DynamicSettings.GetSection<FileStorageSettings>());
+        services.AddSingleton(DynamicSettings.GetSection<NotificationSettings>());
         services.AddSingleton(DynamicSettings.GetSection<DataSettings>());
 
         // ── API Versioning ────────────────────────────────────────────────────

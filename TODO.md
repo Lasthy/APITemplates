@@ -1051,9 +1051,9 @@ public interface IFileStorage
 
 ---
 
-## 14. 🔔 Real-Time Notifications
+## 14. 🔔 Real-Time Notifications ✅
 
-**Priority:** 🟢 Lower  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Notifications/`
 
 ### Motivation
@@ -1071,9 +1071,13 @@ Kernel/Notifications/
 ├── INotificationService.cs        [NEW]
 ├── SignalRNotificationService.cs  [NEW]
 ├── NotificationHub.cs             [NEW] — SignalR Hub
+├── KernelUserIdProvider.cs        [NEW] — IUserIdProvider claim mapping
 ├── NotificationSettings.cs        [NEW] — DynamicSettingsSection (enabled, path)
 └── Extensions/
     └── NotificationExtensions.cs  [NEW]
+
+Host/
+├── appsettings.Notifications.json [NEW]
 ```
 
 ### Interface Shape
@@ -1163,5 +1167,5 @@ public class ApiKey : IAuditable
 - [x] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter + `AesEncryptionService`)
 - [x] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
 - [x] **#13 — File Storage** (`IFileStorage` + local filesystem default)
-- [ ] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)
+- [x] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)
 - [ ] **#15 — API Key Auth** (`ApiKey` entity + auth handler + endpoints)

@@ -6,6 +6,7 @@ using Kernel.Configuration;
 using Kernel.Email;
 using Kernel.Encryption;
 using Kernel.Events;
+using Kernel.Notifications;
 using Kernel.Persistence;
 using Kernel.Storage;
 using Kernel.Testing.Fakes;
@@ -60,13 +61,18 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
     /// </summary>
     public FakeFileStorage FileStorage { get; } = new();
 
+    /// <summary>
+    /// The test fake notification service.
+    /// </summary>
+    public FakeNotificationService NotificationService { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
         builder.ConfigureServices(services =>
         {
-            // Replace EventBus, EmailSender, CacheService, EncryptionService, FileStorage with test fakes
+            // Replace EventBus, EmailSender, CacheService, EncryptionService, FileStorage, NotificationService with test fakes
             services.RemoveAll<IEventBus>();
             services.AddSingleton<IEventBus>(EventBus);
             services.AddSingleton(EventBus);
@@ -86,6 +92,10 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
             services.RemoveAll<IFileStorage>();
             services.AddSingleton<IFileStorage>(FileStorage);
             services.AddSingleton(FileStorage);
+
+            services.RemoveAll<INotificationService>();
+            services.AddSingleton<INotificationService>(NotificationService);
+            services.AddSingleton(NotificationService);
 
             // Configure in-memory database in DataSettings
             var dynamicSettings = services
