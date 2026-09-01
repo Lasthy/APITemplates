@@ -28,6 +28,11 @@ public class ShoppingApiTestFactory : WebApplicationFactory<Program>
 
     public async Task<string> LoginAsync(HttpClient client, string email, string password)
     {
+        if (!client.DefaultRequestHeaders.Contains("X-Forwarded-For"))
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-For", $"10.99.{Random.Shared.Next(1, 254)}.{Random.Shared.Next(1, 254)}");
+        }
+
         var retries = 10;
         HttpResponseMessage response = null!;
         while (retries-- > 0)

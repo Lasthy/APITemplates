@@ -7,6 +7,7 @@ using Kernel.Email;
 using Kernel.Encryption;
 using Kernel.Events;
 using Kernel.Persistence;
+using Kernel.Storage;
 using Kernel.Testing.Fakes;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -54,13 +55,18 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
     /// </summary>
     public FakeEncryptionService EncryptionService { get; } = new();
 
+    /// <summary>
+    /// The test fake file storage service.
+    /// </summary>
+    public FakeFileStorage FileStorage { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
         builder.ConfigureServices(services =>
         {
-            // Replace EventBus, EmailSender, CacheService, EncryptionService with test fakes
+            // Replace EventBus, EmailSender, CacheService, EncryptionService, FileStorage with test fakes
             services.RemoveAll<IEventBus>();
             services.AddSingleton<IEventBus>(EventBus);
             services.AddSingleton(EventBus);
@@ -76,6 +82,10 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
             services.RemoveAll<IEncryptionService>();
             services.AddSingleton<IEncryptionService>(EncryptionService);
             services.AddSingleton(EncryptionService);
+
+            services.RemoveAll<IFileStorage>();
+            services.AddSingleton<IFileStorage>(FileStorage);
+            services.AddSingleton(FileStorage);
 
             // Configure in-memory database in DataSettings
             var dynamicSettings = services

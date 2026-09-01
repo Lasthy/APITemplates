@@ -20,6 +20,7 @@ using Kernel.Partitioning;
 using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
 using Kernel.Requests;
+using Kernel.Storage;
 using Kernel.Testing.Fakes;
 using Kernel.Validation;
 using Kernel.Validation.Extensions;
@@ -76,6 +77,11 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
     public FakeEncryptionService EncryptionService { get; } = new();
 
     /// <summary>
+    /// The test fake file storage service.
+    /// </summary>
+    public FakeFileStorage FileStorage { get; } = new();
+
+    /// <summary>
     /// The centralized JSON serializer.
     /// </summary>
     public IJsonSerializer JsonSerializer { get; } = new JsonSerializer();
@@ -119,6 +125,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         var cacheSettings = new CacheSettings(JsonSerializer, "Testing") { AutoSave = false };
         var encryptionSettings = new EncryptionSettings(JsonSerializer, "Testing") { AutoSave = false };
         var versioningSettings = new VersioningSettings(JsonSerializer, "Testing") { AutoSave = false };
+        var fileStorageSettings = new FileStorageSettings(JsonSerializer, "Testing") { AutoSave = false };
         var dataSettings = new DataSettings(JsonSerializer, "Testing") { AutoSave = false };
         dataSettings.SetValue("Provider", "InMemory");
         dataSettings.SetValue("ConnectionString", DatabaseName);
@@ -131,6 +138,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         DynamicSettings.AddSection(cacheSettings);
         DynamicSettings.AddSection(encryptionSettings);
         DynamicSettings.AddSection(versioningSettings);
+        DynamicSettings.AddSection(fileStorageSettings);
         DynamicSettings.AddSection(dataSettings);
 
         var configBuilder = new ConfigurationBuilder();
@@ -168,6 +176,9 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(EncryptionService);
         services.AddSingleton<IEncryptionService>(EncryptionService);
 
+        services.AddSingleton(FileStorage);
+        services.AddSingleton<IFileStorage>(FileStorage);
+
         // ── Dynamic Settings & Configuration ──────────────────────────────────
         services.AddSingleton<IConfiguration>(Configuration);
         services.AddSingleton(DynamicSettings);
@@ -179,6 +190,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(DynamicSettings.GetSection<CacheSettings>());
         services.AddSingleton(DynamicSettings.GetSection<EncryptionSettings>());
         services.AddSingleton(DynamicSettings.GetSection<VersioningSettings>());
+        services.AddSingleton(DynamicSettings.GetSection<FileStorageSettings>());
         services.AddSingleton(DynamicSettings.GetSection<DataSettings>());
 
         // ── API Versioning ────────────────────────────────────────────────────

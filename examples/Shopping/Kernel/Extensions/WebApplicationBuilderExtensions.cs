@@ -31,6 +31,8 @@ using Kernel.Persistence.Extensions;
 using Kernel.RateLimiting;
 using Kernel.RateLimiting.Extensions;
 using Kernel.Requests;
+using Kernel.Storage;
+using Kernel.Storage.Extensions;
 using Kernel.Validation;
 using Kernel.Validation.Extensions;
 using Kernel.Versioning;
@@ -119,6 +121,9 @@ public static class WebApplicationBuilderExtensions
         var versioningSettings = new VersioningSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(versioningSettings);
 
+        var fileStorageSettings = new FileStorageSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(fileStorageSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
@@ -128,9 +133,13 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(cacheSettings);
         builder.Services.AddSingleton(encryptionSettings);
         builder.Services.AddSingleton(versioningSettings);
+        builder.Services.AddSingleton(fileStorageSettings);
 
         // ── API Versioning ────────────────────────────────────────────────────
         builder.AddKernelVersioning();
+
+        // ── File Storage infrastructure ───────────────────────────────────────
+        builder.Services.AddFileStorage();
 
         // ── Caching infrastructure ────────────────────────────────────────────
         builder.Services.AddMemoryCache();

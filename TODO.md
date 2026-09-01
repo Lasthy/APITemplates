@@ -21,7 +21,7 @@
 | 10 | [Testing Utilities](#10--testing-utilities) | ✅ Completed | `Kernel.Testing/` (new project) |
 | 11 | [Data Encryption](#11--data-encryption) | ✅ Completed | `Kernel/Encryption/` |
 | 12 | [API Versioning](#12--api-versioning) | ✅ Completed | `Kernel/Versioning/` |
-| 13 | [File Storage](#13--file-storage) | 🟢 Lower | `Kernel/Storage/` |
+| 13 | [File Storage](#13--file-storage) | ✅ Completed | `Kernel/Storage/` |
 | 14 | [Real-Time Notifications](#14--real-time-notifications) | 🟢 Lower | `Kernel/Notifications/` |
 | 15 | [API Key Authentication](#15--api-key-authentication) | 🟢 Lower | `mwa-module-identity` |
 
@@ -1009,9 +1009,9 @@ Kernel/Versioning/
 
 ---
 
-## 13. 📦 File Storage
+## 13. 📦 File Storage ✅
 
-**Priority:** 🟢 Lower  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Storage/`
 
 ### Motivation
@@ -1162,6 +1162,6 @@ public class ApiKey : IAuditable
 - [x] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
 - [x] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter + `AesEncryptionService`)
 - [x] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
-- [ ] **#13 — File Storage** (`IFileStorage` + local filesystem default)
+- [x] **#13 — File Storage** (`IFileStorage` + local filesystem default)
 - [ ] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)
 - [ ] **#15 — API Key Auth** (`ApiKey` entity + auth handler + endpoints)

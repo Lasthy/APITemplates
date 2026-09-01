@@ -32,13 +32,14 @@ Solution Root (Shopping.slnx)
 │   ├── Persistence/         # IDbContext, IDbContextSchema, KernelDbContext, DbContextTypeRegistry + EF SaveChanges interceptors
 │   ├── RateLimiting/        # Dynamic, partition-based rate limiting (RateLimitingSettings, extensions)
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces
+│   ├── Storage/             # File storage abstraction (IFileStorage, LocalFileStorage, FileStorageSettings, extensions)
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
 │   ├── Versioning/          # URL/header/query API versioning (VersioningSettings, VersioningExtensions)
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
 ├── Kernel.Testing/          # Testing companion library (fakes, base test fixtures, fluent assertions)
-│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions, ApiVersioningAssertions)
-│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService)
+│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions, ApiVersioningAssertions, FileStorageAssertions)
+│   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService, FakeFileStorage)
 │   └── Infrastructure/      # Base classes & web host factory (KernelTestBase, ModuleTestBase, TestWebApplicationFactory)
 ├── Modules/                 # Directory where module projects live
 │   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
@@ -82,6 +83,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Cache.json` | Dynamic settings for caching: enabled flag, default expiration seconds, global key prefix. |
 | `appsettings.Encryption.json` | Dynamic settings for data encryption: 256-bit AES key (Base64 or passphrase). |
 | `appsettings.Versioning.json` | Dynamic settings for API versioning: default version, headers, query param, url segment flags. |
+| `appsettings.Storage.json` | Dynamic settings for file storage: provider, base path, base URL, max size, allowed extensions. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -357,6 +359,18 @@ A unified API versioning subsystem based on `Asp.Versioning.Http`, `Asp.Versioni
 
 > **Convention:** Version controllers using `[ApiVersion(1.0)]` and `[Route("api/v{version:apiVersion}/...")]`. Minimal APIs can map versioned route groups using `app.NewApiVersionSet()`. Configure global default versioning behavior in `appsettings.Versioning.json`.
 
+### File Storage (`Kernel/Storage/`)
+A unified file and blob storage subsystem with a local filesystem provider, runtime-mutable settings, path traversal protection, size limits, and test fakes:
+
+- **`IFileStorage`** — Abstraction for storing, retrieving, and deleting files and binary blobs (`UploadAsync`, `DownloadAsync`, `DeleteAsync`, `GetUrlAsync`, `ExistsAsync`).
+- **`LocalFileStorage`** — Default filesystem provider. Features directory auto-creation, path traversal attack prevention (`../`, `..\`), file size limit enforcement, and error isolation with railway-oriented `Result`.
+- **`FileStorageSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Storage"`). Loaded from `appsettings.Storage.json`. Exposes `Provider`, `BasePath`, `BaseUrl`, `MaxFileSizeBytes`, `AllowedExtensions`, and `AutoCreateDirectory`.
+- **`StorageExtensions`** (`Kernel/Storage/Extensions/`) — Extension methods: `UploadAsync(path, byte[], ...)`, `DownloadBytesAsync(path, ...)`, `UploadTextAsync(path, text, ...)`, `DownloadTextAsync(path, ...)`, and `AddFileStorage()`.
+- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — Thread-safe in-memory test fake tracking stored files, deleted paths, call counters (`UploadCount`, `DownloadCount`, `DeleteCount`), and failure simulation flags (`SimulateFailureOnUpload`, `SimulateFailureOnDownload`, `SimulateFailureOnDelete`).
+- **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `storage.ShouldHaveFile(path)`, `storage.ShouldHaveFile(path, bytes)`, `storage.ShouldHaveFile(path, text)`, `storage.ShouldNotHaveFile(path)`, `storage.ShouldHaveDeleted(path)`, `storage.ShouldBeEmpty()`, `storage.ShouldHaveCount(count)`.
+
+> **Convention:** Inject `IFileStorage` into services or handlers needing file persistence. Use extension methods (`UploadTextAsync`, `DownloadBytesAsync`) for convenient serialization. In tests, use `fixture.FileStorage` and assert with `fixture.FileStorage.ShouldHaveFile(...)`.
+
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
 
@@ -365,6 +379,7 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`FakeEmailSender`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEmailSender`. Records sent messages (`SentMessages`, `LastSentMessage`, `SentCount`, `HasSent`, `GetSentTo`) and allows simulating errors via `ShouldSucceed` and `FailureError`.
 - **`FakeCacheService`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `ICacheService`. Supports inspecting keys, values, and expiration without external Redis or memory cache dependencies.
 - **`FakeEncryptionService`** (`Kernel.Testing/Fakes/`) — Test fake implementing `IEncryptionService`. Supports transparent prefix transformation or real AES mode, failure simulation, and tracks all encryption/decryption operations.
+- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `IFileStorage`. Tracks stored blobs, deleted paths, and call counts.
 - **`ResultAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertion extensions:
   - `result.ShouldBeSuccess()` — Asserts success, returns `Value` for `Result<T>`.
   - `result.ShouldBeFailure()` / `result.ShouldBeFailure<TException>()` — Asserts failure and error exception type.
@@ -375,9 +390,10 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`CacheAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldContainKey(key)`, `ShouldContain<T>(key, expectedValue)`, `ShouldNotContainKey(key)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
 - **`EncryptionAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveEncrypted(plaintext)`, `ShouldHaveDecrypted(ciphertext)`, `ShouldHaveEncryptedCount(count)`, `ShouldHaveDecryptedCount(count)`, `ShouldBeEmpty()`.
 - **`ApiVersioningAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSupportedApiVersions(versions)`, `ShouldHaveDeprecatedApiVersions(versions)`.
-- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
+- **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveFile(path)`, `ShouldHaveFile(path, bytes)`, `ShouldHaveFile(path, text)`, `ShouldNotHaveFile(path)`, `ShouldHaveDeleted(path)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
+- **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
 - **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
-- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, and `EncryptionService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
+- **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, `EncryptionService`, and `FileStorage`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).
 
 > **Convention:** In test projects, reference `Kernel.Testing.csproj`. For unit/handler tests of a module, inherit from `ModuleTestBase<MyModule, MyDbContext>`. Use `Dispatcher.DispatchAsync(request)`, configure identity with `ScopeContext.AsSystem()` or `ScopeContext.AsAuthenticated()`, assert outcomes with `.ShouldBeSuccess()`, and assert event publications with `EventBus.ShouldHavePublished<MyEvent>()`. For full HTTP endpoint integration tests, use `TestWebApplicationFactory<Program>`.
 
