@@ -17,7 +17,7 @@
 | 6 | [Observability / Diagnostics](#6--observability--diagnostics) | ✅ Completed | `Kernel/Diagnostics/` |
 | 7 | [Structured Audit Log](#7--structured-audit-log) | ✅ Completed | `Kernel/AuditLog/` |
 | 8 | [Caching Abstraction](#8--caching-abstraction) | ✅ Completed | `Kernel/Caching/` |
-| 9 | [Inbox / Idempotency](#9--inbox--idempotency) | 🟡 Medium | `Kernel/Messaging/` |
+| 9 | [Inbox / Idempotency](#9--inbox--idempotency) | ✅ Completed | `Kernel/Messaging/` |
 | 10 | [Testing Utilities](#10--testing-utilities) | 🟡 Medium | `Kernel.Testing/` (new project) |
 | 11 | [Data Encryption](#11--data-encryption) | 🟢 Lower | `Kernel/Encryption/` |
 | 12 | [API Versioning](#12--api-versioning) | 🟢 Lower | `Kernel/Versioning/` |
@@ -849,9 +849,9 @@ public class GetUserHandler : IRequestHandler<GetUser, UserDetailDto> { ... }
 
 ---
 
-## 9. 🔄 Inbox / Idempotency
+## 9. 🔄 Inbox / Idempotency ✅
 
-**Priority:** 🟡 Medium  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Messaging/`
 
 ### Motivation
@@ -1158,7 +1158,7 @@ public class ApiKey : IAuditable
 - [x] **#6 — Observability** (correlation ID + request diagnostics middleware)
 - [x] **#7 — Structured Audit Log** (`AuditEntry` + SaveChanges interceptor + query endpoint)
 - [x] **#8 — Caching** (`ICacheService` + in-memory default + `[Cache]` interceptor)
-- [ ] **#9 — Inbox / Idempotency** (`InboxEntry` + inbox check in `EventMessageProcessor`)
+- [x] **#9 — Inbox / Idempotency** (`InboxEntry` + inbox check in `EventMessageProcessor`)
 - [ ] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
 - [ ] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter)
 - [ ] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)

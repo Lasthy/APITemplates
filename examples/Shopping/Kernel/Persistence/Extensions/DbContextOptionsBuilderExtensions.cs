@@ -49,7 +49,7 @@ public static class DbContextOptionsBuilderExtensions
                 {
                     x.MigrationsHistoryTable($"__EFMigrationsHistory_{schema.ToLowerInvariant()}");
                 }
-            }),
+            }).ConfigureWarnings(w => w.Ignore(RelationalEventId.AmbientTransactionWarning)),
 
             "sqlserver" => builder.UseSqlServer(connectionString, x =>
             {

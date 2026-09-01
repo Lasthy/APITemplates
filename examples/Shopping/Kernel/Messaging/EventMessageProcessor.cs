@@ -9,12 +9,14 @@ namespace Kernel.Messaging;
 
 /// <summary>
 /// Processes <see cref="MessageChannel.Event"/> messages from the outbox.
-/// Deserializes the message content, resolves the event type, and publishes to <see cref="IEventBus"/>.
+/// Uses <see cref="IInbox"/> to guarantee idempotency, deserializes the message content,
+/// resolves the event type, and publishes to <see cref="IEventBus"/>.
 /// </summary>
 public class EventMessageProcessor(
     IEventBus _eventBus,
     IEventTypeRegistry _registry,
     IJsonSerializer _jsonSerializer,
+    IInbox _inbox,
     ILogger<EventMessageProcessor> _logger
 ) : IMessageProcessor
 {
@@ -27,6 +29,14 @@ public class EventMessageProcessor(
             _logger.LogInformation(
                 "Processing message: Id={MessageId}, Channel={Channel}, Type={Type}",
                 message.Id, message.Channel, message.Type);
+
+            if (await _inbox.HasBeenProcessedAsync(message.Id, cancellationToken))
+            {
+                _logger.LogInformation(
+                    "Message Id={MessageId} has already been processed in the inbox. Skipping duplicate execution.",
+                    message.Id);
+                return Result.Success();
+            }
 
             using var transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
@@ -42,6 +52,8 @@ public class EventMessageProcessor(
 
             await _eventBus.PublishAsync(@event, cancellationToken);
 
+            await _inbox.MarkProcessedAsync(message.Id, cancellationToken);
+
             transactionScope.Complete();
 
             _logger.LogInformation("Processed message Id={MessageId} successfully.", message.Id);
@@ -56,3 +68,4 @@ public class EventMessageProcessor(
         }
     }
 }
+

@@ -131,7 +131,8 @@ public static class WebApplicationBuilderExtensions
         // ── Partition manager ─────────────────────────────────────────────────
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
 
-        // ── Messaging / outbox ────────────────────────────────────────────────
+        // ── Messaging / outbox / inbox ────────────────────────────────────────
+        builder.Services.AddScoped<IInbox, Inbox>();
         builder.Services.AddScoped<IMessageWriter, MessageWriter>();
         builder.Services.AddScoped<IMessageDispatcher, MessageDispatcher>();
         builder.Services.AddScoped<IMessageProcessor, EventMessageProcessor>();

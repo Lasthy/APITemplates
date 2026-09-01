@@ -206,18 +206,20 @@ Standardized context for the current operation scope, providing authentication a
   - Error handling with structured logging
   - Supports `RequestCancellation()` for graceful self-stop.
 
-### Messaging & Outbox (`Kernel/Messaging/`)
-Channel-based outbox message persistence, partition-sharded background processing, fault tolerance, and retention management:
+### Messaging, Outbox & Inbox (`Kernel/Messaging/`)
+Channel-based outbox message persistence, partition-sharded background processing, inbox idempotency, fault tolerance, and retention management:
 
 - **`Message`** — Entity storing serialized payload, CLR type, channel, partition, and lifecycle timestamps (`OccurredAt`, `ProcessingAt`, `ProcessedAt`, `NextRetryAt`, `RetryCount`, `LastError`).
+- **`InboxEntry`** — Entity storing processed message IDs (`Id`, `MessageId`, `ProcessedAt`) to guarantee idempotency and avoid duplicate processing upon retries.
+- **`IInbox` / `Inbox`** — Abstraction and EF Core implementation for checking (`HasBeenProcessedAsync`) and marking (`MarkProcessedAsync`) processed messages.
 - **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a random partition via `IPartitionManager`, and persists to `KernelDbContext.Messages`.
-- **`IMessageProcessor`** — Per-channel processing contract (`GetChannel()`, `ProcessMessage()`). Default implementation: `EventMessageProcessor` for `MessageChannel.Event`.
+- **`IMessageProcessor`** — Per-channel processing contract (`GetChannel()`, `ProcessMessage()`). Implementations: `EventMessageProcessor` (with `IInbox` idempotency guard for `MessageChannel.Event`), `EmailMessageProcessor` for `MessageChannel.Email`.
 - **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages by channel to their corresponding processor, returning `Task<Result>`.
 - **`MessageProcessingWorker`** — Hosted `BaseWorker` running on `ProcessingIntervalSeconds`:
   - **Partitioning**: Only processes messages matching `instanceSettings.Partition` (`[Start..End]`).
   - **Stuck/Timeout Recovery**: Detects messages in `ProcessingAt` exceeding `ProcessingTimeoutSeconds` and marks them timed out for retry.
   - **Exponential Backoff**: Reschedules failed messages with exponential delay ($2^{\text{retry}-1} \times \text{InitialDelay}$, capped at `MaxRetryDelaySeconds`) until `MaxRetryAttempts`.
-- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages older than `CleanupRetentionDays` (and optionally permanently failed messages).
+- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages and expired inbox entries older than `CleanupRetentionDays` (and optionally permanently failed messages).
 - **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
 
 ### Request/Response & Interceptors (`Kernel/Requests/`)
@@ -236,7 +238,7 @@ Shared database infrastructure and automated cross-cutting concerns:
 
 - **`IDbContext`** — Common interface for database contexts exposing standard EF Core operations.
 - **`IDbContextSchema`** — Interface for DbContexts defining a module schema (`string Schema { get; }`).
-- **`KernelDbContext`** — Concrete DbContext for Kernel entities (`DbSet<Message> Messages`).
+- **`KernelDbContext`** — Concrete DbContext for Kernel entities (`DbSet<Message> Messages`, `DbSet<InboxEntry> InboxEntries`, `DbSet<AuditEntry> AuditEntries`).
 - **`DbContextTypeRegistry`** — Registry of all DbContext types registered across the host and active modules.
 - **`ModelBuilderExtensions`** — `ApplySchema(schema, database)` extension method that sets the default schema on relational databases and safely bypasses providers without schema support (SQLite, InMemory).
 - **`AuditSaveChangesInterceptor`** — Automatically sets `CreatedAt`/`CreatedBy` on entity addition and `UpdatedAt`/`UpdatedBy` on entity modification using `IScopeContext`.

@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
+using Kernel.Messaging;
+
 namespace Kernel.AuditLog;
 
 /// <summary>
@@ -95,8 +97,8 @@ public class AuditLogSaveChangesInterceptor : SaveChangesInterceptor
 
         foreach (var entry in context.ChangeTracker.Entries())
         {
-            // Skip audit entries themselves and internal outbox messages to avoid infinite recursion / noise
-            if (entry.Entity is AuditEntry || entry.Entity is Message)
+            // Skip audit entries themselves and internal outbox/inbox messages to avoid infinite recursion / noise
+            if (entry.Entity is AuditEntry || entry.Entity is Message || entry.Entity is InboxEntry)
             {
                 continue;
             }

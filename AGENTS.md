@@ -225,23 +225,25 @@ Infrastructure for pluggable modules.
 
 > **Convention:** Each module project must have exactly one class implementing `IModule`. The class name doesn't matter; it's discovered by interface. The module assembly name must match the key in `ActiveModules`.
 
-#### Messaging / Outbox (`Kernel/Messaging/`)
-A channel-based message persistence, partition-sharded background processing, and retention system (outbox pattern).
+#### Messaging / Outbox & Inbox (`Kernel/Messaging/`)
+A channel-based message persistence, partition-sharded background processing, inbox idempotency, and retention system (outbox + inbox pattern).
 
 - **`Message`** — Entity with `Id`, `Type` (CLR type name), `Content` (serialized JSON), `Channel` (enum), `OccurredAt`, `ProcessedAt`, `ProcessingAt`, `RetryCount`, `NextRetryAt`, `Partition`, `LastError`, `CorrelationId`. Exposes state helper methods: `MarkProcessing()`, `MarkProcessed()`, `MarkFailed()`, `MarkTimedOut()`, `IsProcessingTimedOut()`.
+- **`InboxEntry`** — Entity recording processed message IDs (`Id`, `MessageId`, `ProcessedAt`) to ensure idempotent processing and avoid duplicate side effects on retries.
+- **`IInbox` / `Inbox`** — Abstraction and EF Core implementation for checking (`HasBeenProcessedAsync`) and recording (`MarkProcessedAsync`) processed message IDs against `KernelDbContext.InboxEntries`.
 - **`MessageChannel`** — Enum: `Event`, `Email`.
 - **`IMessageWriter` / `MessageWriter`** — Serializes content, assigns a partition via `IPartitionManager`, captures ambient `CorrelationId` from `IScopeContext`, persists to `KernelDbContext.Messages`.
 - **`IMessageProcessor`** — Per-channel processor: `GetChannel()`, `ProcessMessage()`.
-- **`EventMessageProcessor`** — Processes `MessageChannel.Event` messages: resolves event type via `IEventTypeRegistry`, deserializes, publishes to `IEventBus` within a `TransactionScope`.
+- **`EventMessageProcessor`** — Processes `MessageChannel.Event` messages: verifies message hasn't been processed via `IInbox`, resolves event type via `IEventTypeRegistry`, deserializes, publishes to `IEventBus` within a `TransactionScope`, and records the message in `IInbox`.
 - **`IMessageDispatcher` / `MessageDispatcher`** — Routes messages to the correct `IMessageProcessor` by channel, returning `Task<Result>`.
 - **`MessageProcessingWorker`** — Hosted `BaseWorker` running on `ProcessingIntervalSeconds`:
   - **Partitioning**: Only processes messages matching `instanceSettings.Partition` (`[Start..End]`).
   - **Stuck/Timeout Recovery**: Detects messages in `ProcessingAt` exceeding `ProcessingTimeoutSeconds` and marks them timed out for retry.
   - **Exponential Backoff**: Reschedules failed messages with exponential delay ($2^{\text{retry}-1} \times \text{InitialDelay}$, capped at `MaxRetryDelaySeconds`) until `MaxRetryAttempts`.
-- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages older than `CleanupRetentionDays` (and optionally permanently failed messages).
+- **`MessageCleanupWorker`** — Hosted `BaseWorker` running on `CleanupIntervalHours`, deleting processed messages and expired inbox entries older than `CleanupRetentionDays` (and optionally permanently failed messages).
 - **`MessagingSettings`** — Dynamic settings loaded from `settings.Messaging.json`.
 
-> **Note:** The `Message` class and related types use `Kernel.Boxing` namespace (not `Kernel.Messaging`). This is the current convention.
+> **Note:** The `Message` class and related types use `Kernel.Boxing` namespace, while `InboxEntry`, `IInbox`, and `Inbox` use `Kernel.Messaging`.
 
 #### Observability & Diagnostics (`Kernel/Diagnostics/`)
 Comprehensive HTTP and outbox observability infrastructure with correlation tracking, request duration metrics, and OpenTelemetry diagnostic activities.

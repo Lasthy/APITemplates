@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Kernel.Messaging.Workers;
 
 /// <summary>
-/// Periodic background worker that deletes old processed (and optionally permanently failed) messages after a configured retention period.
+/// Periodic background worker that deletes old processed (and optionally permanently failed) messages and inbox entries after a configured retention period.
 /// </summary>
 public class MessageCleanupWorker(
     IServiceScopeFactory scopeFactory,
@@ -25,7 +25,7 @@ public class MessageCleanupWorker(
         var cutoff = DateTime.UtcNow.AddDays(-messagingSettings.CleanupRetentionDays);
 
         logger.LogDebug(
-            "MessageCleanupWorker: Checking for messages older than {Days} days (cutoff: {Cutoff}).",
+            "MessageCleanupWorker: Checking for messages and inbox entries older than {Days} days (cutoff: {Cutoff}).",
             messagingSettings.CleanupRetentionDays, cutoff);
 
         // Fetch old processed messages
@@ -58,5 +58,25 @@ public class MessageCleanupWorker(
         {
             logger.LogDebug("MessageCleanupWorker: No expired messages found for cleanup.");
         }
+
+        // Fetch and clean up old inbox entries
+        var inboxEntriesToDelete = await db.InboxEntries
+            .Where(i => i.ProcessedAt <= cutoff)
+            .ToListAsync(cancellationToken);
+
+        if (inboxEntriesToDelete.Count > 0)
+        {
+            db.InboxEntries.RemoveRange(inboxEntriesToDelete);
+            await db.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "MessageCleanupWorker: Successfully cleaned up {Count} inbox entry/entries older than {Days} days.",
+                inboxEntriesToDelete.Count, messagingSettings.CleanupRetentionDays);
+        }
+        else
+        {
+            logger.LogDebug("MessageCleanupWorker: No expired inbox entries found for cleanup.");
+        }
     }
 }
+

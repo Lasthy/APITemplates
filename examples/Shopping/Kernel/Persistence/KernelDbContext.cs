@@ -1,5 +1,6 @@
 using Kernel.AuditLog;
 using Kernel.Boxing;
+using Kernel.Messaging;
 using Kernel.Persistence.Extensions;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,11 @@ public class KernelDbContext : DbContext, IDbContextSchema
     /// Outbox and inbox persistent messages.
     /// </summary>
     public DbSet<Message> Messages { get; set; } = null!;
+
+    /// <summary>
+    /// Inbox processed message records for idempotency.
+    /// </summary>
+    public DbSet<InboxEntry> InboxEntries { get; set; } = null!;
 
     /// <summary>
     /// Structured audit log entries.
@@ -58,6 +64,17 @@ public class KernelDbContext : DbContext, IDbContextSchema
             entity.HasIndex(e => e.CorrelationId);
         });
 
+        modelBuilder.Entity<InboxEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(26);
+            entity.Property(e => e.MessageId).HasMaxLength(26).IsRequired();
+            entity.Property(e => e.ProcessedAt).IsRequired();
+
+            entity.HasIndex(e => e.MessageId).IsUnique();
+            entity.HasIndex(e => e.ProcessedAt);
+        });
+
         modelBuilder.Entity<AuditEntry>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -76,3 +93,4 @@ public class KernelDbContext : DbContext, IDbContextSchema
         });
     }
 }
+
