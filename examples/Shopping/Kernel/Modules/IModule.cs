@@ -29,6 +29,11 @@ public interface IModule
     static abstract void RegisterPolicies(Microsoft.AspNetCore.Authorization.AuthorizationOptions options);
 
     /// <summary>
+    /// Supported API versions for this module. Defaults to <c>[ 1.0 ]</c>.
+    /// </summary>
+    static virtual IReadOnlyList<Asp.Versioning.ApiVersion> SupportedVersions => [new Asp.Versioning.ApiVersion(1, 0)];
+
+    /// <summary>
     /// Maps the module's HTTP endpoints onto the application route builder.
     /// Called during <c>app.UseModules()</c> after the host is built.
     /// </summary>

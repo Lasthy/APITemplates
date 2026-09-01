@@ -20,7 +20,7 @@
 | 9 | [Inbox / Idempotency](#9--inbox--idempotency) | ✅ Completed | `Kernel/Messaging/` |
 | 10 | [Testing Utilities](#10--testing-utilities) | ✅ Completed | `Kernel.Testing/` (new project) |
 | 11 | [Data Encryption](#11--data-encryption) | ✅ Completed | `Kernel/Encryption/` |
-| 12 | [API Versioning](#12--api-versioning) | 🟢 Lower | `Kernel/Versioning/` |
+| 12 | [API Versioning](#12--api-versioning) | ✅ Completed | `Kernel/Versioning/` |
 | 13 | [File Storage](#13--file-storage) | 🟢 Lower | `Kernel/Storage/` |
 | 14 | [Real-Time Notifications](#14--real-time-notifications) | 🟢 Lower | `Kernel/Notifications/` |
 | 15 | [API Key Authentication](#15--api-key-authentication) | 🟢 Lower | `mwa-module-identity` |
@@ -978,9 +978,9 @@ public interface IEncryptionService
 
 ---
 
-## 12. 📜 API Versioning
+## 12. 📜 API Versioning ✅
 
-**Priority:** 🟢 Lower  
+**Status:** ✅ Completed  
 **Location:** `Kernel/Versioning/`
 
 ### Motivation
@@ -1161,7 +1161,7 @@ public class ApiKey : IAuditable
 - [x] **#9 — Inbox / Idempotency** (`InboxEntry` + inbox check in `EventMessageProcessor`)
 - [x] **#10 — Testing Utilities** (fakes + test base classes + assertion helpers)
 - [x] **#11 — Data Encryption** (`IEncryptionService` + `[Encrypted]` EF converter + `AesEncryptionService`)
-- [ ] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
+- [x] **#12 — API Versioning** (`Asp.Versioning` integration + module-level versions)
 - [ ] **#13 — File Storage** (`IFileStorage` + local filesystem default)
 - [ ] **#14 — Real-Time Notifications** (`INotificationService` + SignalR hub)
 - [ ] **#15 — API Key Auth** (`ApiKey` entity + auth handler + endpoints)

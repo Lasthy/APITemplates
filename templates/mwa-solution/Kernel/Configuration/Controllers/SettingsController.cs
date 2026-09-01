@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Kernel.Common;
 using Kernel.Configuration.Features;
 using Kernel.Constants;
@@ -11,7 +12,8 @@ using System.Text.Json;
 namespace Kernel.Configuration.Controllers;
 
 [ApiController]
-[Route("api/v1/kernel/settings")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/kernel/settings")]
 [Authorize(Roles = Roles.System)]
 [ApiExplorerSettings(GroupName = "kernel")]
 [Tags("Settings")]

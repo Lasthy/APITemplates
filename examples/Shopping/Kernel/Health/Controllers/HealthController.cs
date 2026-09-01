@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Kernel.Constants;
 using Kernel.Health.Features;
 using Kernel.Requests;
@@ -8,7 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Kernel.Health.Controllers;
 
 [ApiController]
-[Route("api/v1/kernel/health")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/kernel/health")]
 [ApiExplorerSettings(GroupName = "kernel")]
 [Tags("Health")]
 public class HealthController : ControllerBase

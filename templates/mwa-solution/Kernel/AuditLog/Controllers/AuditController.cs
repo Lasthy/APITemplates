@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Kernel.AuditLog.Features;
 using Kernel.Common;
 using Kernel.Constants;
@@ -9,7 +10,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Kernel.AuditLog.Controllers;
 
 [ApiController]
-[Route("api/v1/kernel/audit")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/kernel/audit")]
 [Authorize(Roles = Roles.System)]
 [ApiExplorerSettings(GroupName = "kernel")]
 [Tags("Audit")]

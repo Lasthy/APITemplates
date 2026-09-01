@@ -33,10 +33,11 @@ Solution Root (Shopping.slnx)
 │   ├── RateLimiting/        # Dynamic, partition-based rate limiting (RateLimitingSettings, extensions)
 │   ├── Requests/            # Request/Response + Dispatcher + Interceptor interfaces
 │   ├── Ulid/                # Vendored Ulid implementation + EF/JSON/Type converters
+│   ├── Versioning/          # URL/header/query API versioning (VersioningSettings, VersioningExtensions)
 │   ├── Workers/             # BaseWorker background service (periodic / one-shot)
 │   └── ThirdParty/          # Third-party license files
 ├── Kernel.Testing/          # Testing companion library (fakes, base test fixtures, fluent assertions)
-│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions)
+│   ├── Assertions/          # Fluent assertions (ResultAssertions, EventBusAssertions, EmailSenderAssertions, CacheAssertions, EncryptionAssertions, ApiVersioningAssertions)
 │   ├── Fakes/               # Test fakes (FakeEventBus, FakeScopeContext, FakeEmailSender, FakeCacheService, FakeEncryptionService)
 │   └── Infrastructure/      # Base classes & web host factory (KernelTestBase, ModuleTestBase, TestWebApplicationFactory)
 ├── Modules/                 # Directory where module projects live
@@ -80,6 +81,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.RateLimiting.json` | Dynamic settings for rate limiting: global policy, authenticated policy, endpoint overrides, rejection response. |
 | `appsettings.Cache.json` | Dynamic settings for caching: enabled flag, default expiration seconds, global key prefix. |
 | `appsettings.Encryption.json` | Dynamic settings for data encryption: 256-bit AES key (Base64 or passphrase). |
+| `appsettings.Versioning.json` | Dynamic settings for API versioning: default version, headers, query param, url segment flags. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -345,6 +347,16 @@ Column-level authenticated data encryption at rest using AES-256-GCM and transpa
 
 > **Convention:** Decorate sensitive entity properties (tokens, credentials, secrets) with `[Encrypted]` and call `modelBuilder.UseEncryption(this)` or `modelBuilder.UseEncryption(encryptionService)` in `OnModelCreating`. Inject `IEncryptionService` when explicit manual data encryption/decryption is required.
 
+### API Versioning (`Kernel/Versioning/`)
+A unified API versioning subsystem based on `Asp.Versioning.Http`, `Asp.Versioning.Mvc`, and `Asp.Versioning.Mvc.ApiExplorer`, configurable at runtime via `VersioningSettings` and `appsettings.Versioning.json`:
+
+- **`VersioningSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Versioning"`). Loaded from `appsettings.Versioning.json`. Exposes `DefaultVersion`, `AssumeDefaultVersionWhenUnspecified`, `ReportApiVersions`, `ApiVersionHeader`, `ApiVersionQueryParam`, `EnableUrlSegmentVersioning`, `EnableHeaderVersioning`, `EnableQueryVersioning`, `GetDefaultApiVersion()`, and `CreateApiVersionReader()`.
+- **`VersioningExtensions`** — Extension methods: `builder.AddKernelVersioning()` / `services.AddKernelVersioning(settings)`.
+- **`IModule.SupportedVersions`** — Default interface property (`static virtual IReadOnlyList<ApiVersion> SupportedVersions => [new ApiVersion(1, 0)];`).
+- **`ApiVersioningAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions (`ShouldHaveSupportedApiVersions()`, `ShouldHaveDeprecatedApiVersions()`) on `HttpResponseMessage`.
+
+> **Convention:** Version controllers using `[ApiVersion(1.0)]` and `[Route("api/v{version:apiVersion}/...")]`. Minimal APIs can map versioned route groups using `app.NewApiVersionSet()`. Configure global default versioning behavior in `appsettings.Versioning.json`.
+
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
 
@@ -362,6 +374,7 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`EmailSenderAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSent()`, `ShouldHaveSent(predicate)`, `ShouldHaveSentTo(email)`, `ShouldHaveSentCount(count)`, `ShouldNotHaveSent()`.
 - **`CacheAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldContainKey(key)`, `ShouldContain<T>(key, expectedValue)`, `ShouldNotContainKey(key)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
 - **`EncryptionAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveEncrypted(plaintext)`, `ShouldHaveDecrypted(ciphertext)`, `ShouldHaveEncryptedCount(count)`, `ShouldHaveDecryptedCount(count)`, `ShouldBeEmpty()`.
+- **`ApiVersioningAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSupportedApiVersions(versions)`, `ShouldHaveDeprecatedApiVersions(versions)`.
 - **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
 - **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
 - **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, and `EncryptionService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).

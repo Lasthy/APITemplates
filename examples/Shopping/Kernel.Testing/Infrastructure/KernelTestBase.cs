@@ -23,6 +23,8 @@ using Kernel.Requests;
 using Kernel.Testing.Fakes;
 using Kernel.Validation;
 using Kernel.Validation.Extensions;
+using Kernel.Versioning;
+using Kernel.Versioning.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -116,6 +118,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         var emailSettings = new EmailSettings(JsonSerializer, "Testing") { AutoSave = false };
         var cacheSettings = new CacheSettings(JsonSerializer, "Testing") { AutoSave = false };
         var encryptionSettings = new EncryptionSettings(JsonSerializer, "Testing") { AutoSave = false };
+        var versioningSettings = new VersioningSettings(JsonSerializer, "Testing") { AutoSave = false };
         var dataSettings = new DataSettings(JsonSerializer, "Testing") { AutoSave = false };
         dataSettings.SetValue("Provider", "InMemory");
         dataSettings.SetValue("ConnectionString", DatabaseName);
@@ -127,6 +130,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         DynamicSettings.AddSection(emailSettings);
         DynamicSettings.AddSection(cacheSettings);
         DynamicSettings.AddSection(encryptionSettings);
+        DynamicSettings.AddSection(versioningSettings);
         DynamicSettings.AddSection(dataSettings);
 
         var configBuilder = new ConfigurationBuilder();
@@ -174,7 +178,11 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
         services.AddSingleton(DynamicSettings.GetSection<EmailSettings>());
         services.AddSingleton(DynamicSettings.GetSection<CacheSettings>());
         services.AddSingleton(DynamicSettings.GetSection<EncryptionSettings>());
+        services.AddSingleton(DynamicSettings.GetSection<VersioningSettings>());
         services.AddSingleton(DynamicSettings.GetSection<DataSettings>());
+
+        // ── API Versioning ────────────────────────────────────────────────────
+        services.AddKernelVersioning(DynamicSettings.GetSection<VersioningSettings>());
 
         // ── Partition Manager ─────────────────────────────────────────────────
         services.AddSingleton<IPartitionManager, PartitionManager>();

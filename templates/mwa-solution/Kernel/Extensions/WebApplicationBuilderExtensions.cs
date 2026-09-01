@@ -33,6 +33,8 @@ using Kernel.RateLimiting.Extensions;
 using Kernel.Requests;
 using Kernel.Validation;
 using Kernel.Validation.Extensions;
+using Kernel.Versioning;
+using Kernel.Versioning.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -114,6 +116,9 @@ public static class WebApplicationBuilderExtensions
         var encryptionSettings = new EncryptionSettings(jsonSerializer, environment);
         dynamicSettings.AddSection(encryptionSettings);
 
+        var versioningSettings = new VersioningSettings(jsonSerializer, environment);
+        dynamicSettings.AddSection(versioningSettings);
+
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
         builder.Services.AddSingleton(applicationSettings);
@@ -122,6 +127,10 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton(emailSettings);
         builder.Services.AddSingleton(cacheSettings);
         builder.Services.AddSingleton(encryptionSettings);
+        builder.Services.AddSingleton(versioningSettings);
+
+        // ── API Versioning ────────────────────────────────────────────────────
+        builder.AddKernelVersioning();
 
         // ── Caching infrastructure ────────────────────────────────────────────
         builder.Services.AddMemoryCache();

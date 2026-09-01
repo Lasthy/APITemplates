@@ -6,8 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OutputType>library</OutputType>
-    <!-- Suppress NU1903 (OpenApi vulnerability) and NU1608 (Pomelo EFCore relational version constraint) -->
-    <NoWarn>$(NoWarn);NU1903;NU1608</NoWarn>
+    <!-- Suppress NU1903 (OpenApi vulnerability), NU1608 (Pomelo EFCore relational version constraint), and AV0029/AV0030 (OpenAPI versioning analyzers) -->
+    <NoWarn>$(NoWarn);NU1903;NU1608;AV0029;AV0030</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Http" Version="10.2.3" />
+    <PackageReference Include="Asp.Versioning.Mvc" Version="10.2.1" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
