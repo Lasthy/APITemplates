@@ -19,4 +19,11 @@ public static class IdentityPolicies
     /// Policy requiring Admin or System access.
     /// </summary>
     public const string Admin = "IdentityAdmin";
+
+    /// <summary>
+    /// Policy requiring permission to manage API keys.
+    /// Satisfied by System super-users, users with CanManageApiKeys profile capability,
+    /// users with the CanManageApiKeys claim, or users in configured allowed roles.
+    /// </summary>
+    public const string ManageApiKeys = "ManageApiKeys";
 }

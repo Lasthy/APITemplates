@@ -117,6 +117,7 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
             entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
             entity.Property(e => e.KeyHash).HasMaxLength(128).IsRequired();
             entity.Property(e => e.KeyPrefix).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.Scopes).HasMaxLength(512);
             entity.Property(e => e.CreatedBy).HasMaxLength(26);
             entity.Property(e => e.UpdatedBy).HasMaxLength(26);
 

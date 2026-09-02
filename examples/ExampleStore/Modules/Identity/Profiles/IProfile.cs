@@ -87,4 +87,10 @@ public interface IProfile
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     static abstract Task OnUserCreatedAsync(ProfileCreationContext context, CancellationToken ct);
+
+    /// <summary>
+    /// If <c>true</c>, users created with this profile are permitted to create and manage their own API keys.
+    /// Defaults to <c>false</c>.
+    /// </summary>
+    static virtual bool CanManageApiKeys => false;
 }

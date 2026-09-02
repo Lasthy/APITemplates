@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Identity.Authorization;
 using Identity.Contracts.Constants;
 using Identity.Contracts.Dtos;
 using Identity.Features.ApiKeys;
@@ -19,6 +20,7 @@ namespace Identity.Controllers;
 [Route("api/v{version:apiVersion}/identity/api-keys")]
 [ApiExplorerSettings(GroupName = "Identity")]
 [Tags("ApiKeys")]
+[AuthorizePolicy<CanManageApiKeysPolicy>]
 public class ApiKeysController : ControllerBase
 {
     private readonly IDispatcher _dispatcher;
@@ -38,13 +40,14 @@ public class ApiKeysController : ControllerBase
     public record CreateApiKeyRequest(
         string Name,
         DateTime? ExpiresAt = null,
-        DefaultId? UserId = null);
+        DefaultId? UserId = null,
+        IReadOnlyList<string>? Scopes = null);
 
     /// <summary>
     /// Generate a new API key. Returns the plaintext API key secret once upon creation.
     /// </summary>
     [HttpPost]
-    [AuthorizePolicy<AuthenticatedPolicy>]
+    [AuthorizePolicy<CanManageApiKeysPolicy>]
     public async Task<IActionResult> CreateApiKey(
         [FromBody] CreateApiKeyRequest body,
         CancellationToken ct)
@@ -63,7 +66,7 @@ public class ApiKeysController : ControllerBase
         }
 
         var result = await _dispatcher.DispatchAsync(
-            new CreateApiKey(targetUserId, body.Name, body.ExpiresAt), ct);
+            new CreateApiKey(targetUserId, body.Name, body.ExpiresAt, body.Scopes), ct);
 
         return result.Match<IActionResult>(
             success => CreatedAtAction(nameof(GetApiKey), new { id = success.Id }, success),
@@ -79,7 +82,7 @@ public class ApiKeysController : ControllerBase
     /// administrators can view keys for all users or filter by user ID.
     /// </summary>
     [HttpGet]
-    [AuthorizePolicy<AuthenticatedPolicy>]
+    [AuthorizePolicy<CanManageApiKeysPolicy>]
     public async Task<IActionResult> GetApiKeys(
         [FromQuery] DefaultId? userId = null,
         [FromQuery] int page = 1,
@@ -116,7 +119,7 @@ public class ApiKeysController : ControllerBase
     /// Get API key metadata by ID (without the secret).
     /// </summary>
     [HttpGet("{id}")]
-    [AuthorizePolicy<AuthenticatedPolicy>]
+    [AuthorizePolicy<CanManageApiKeysPolicy>]
     public async Task<IActionResult> GetApiKey(
         [FromRoute] DefaultId id,
         CancellationToken ct)
@@ -152,7 +155,7 @@ public class ApiKeysController : ControllerBase
     /// </summary>
     [HttpDelete("{id}")]
     [HttpPost("{id}/revoke")]
-    [AuthorizePolicy<AuthenticatedPolicy>]
+    [AuthorizePolicy<CanManageApiKeysPolicy>]
     public async Task<IActionResult> RevokeApiKey(
         [FromRoute] DefaultId id,
         CancellationToken ct)

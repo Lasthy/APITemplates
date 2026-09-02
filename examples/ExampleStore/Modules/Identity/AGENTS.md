@@ -90,6 +90,7 @@ Key points:
 - **`Roles`**: Automatically assigned on user creation. Roles are seeded at startup by `RoleSeedWorker`.
 - **`Claims`**: Static claims assigned on user creation.
 - **`PreferencesType`**: If set, the user preferences JSON is validated against this type on update.
+- **`CanManageApiKeys`**: If `true`, users with this profile are permitted to create and manage their own API keys. Defaults to `false` (e.g. public `BuyerProfile` is `false`, `AdminProfile` and `SystemProfile` are `true`).
 - **`OnUserCreatedAsync`**: Hook for side effects (creating companion entities, adding dynamic claims).
 
 ### Profile Discovery
@@ -120,13 +121,24 @@ The cookie is "read-only" from JavaScript's perspective (`HttpOnly` prevents cli
 
 On refresh, the old refresh token is revoked and a new one is issued. This prevents token replay attacks. The refresh token chain is tracked via `ReplacedByToken` for audit.
 
-### API Key Authentication
+### API Key Authentication & Governance
 
 Server-to-server integrations, CI/CD tools, and background processes can authenticate via API keys using the `X-API-Key: mwa_<hex>` header.
 - **Plaintext secret returned once:** Plaintext keys are prefixed with `mwa_` and returned only once upon creation.
 - **SHA-256 hashed storage:** The database only stores the cryptographic SHA-256 hash.
-- **Claims & Roles inheritance:** The resulting `ClaimsPrincipal` inherits all roles and claims of the owner user, with added `IdentityClaimTypes.ApiKeyId` and `IdentityClaimTypes.ApiKeyName`.
+- **Claims & Roles inheritance:** The resulting `ClaimsPrincipal` inherits roles and claims of the owner user, with added `IdentityClaimTypes.ApiKeyId`, `IdentityClaimTypes.ApiKeyName`, and granted `scope` claims. Sensitive administrative claims like `can_manage_api_keys` are never assigned to API keys.
 - **Active validation:** Keys that are expired, revoked, or belonging to banned users are rejected automatically. Valid authentications update `LastUsedAt`.
+- **Gated Creation (`ManageApiKeys` policy):** Public users cannot create API keys. Key creation is gated by `CanManageApiKeysPolicy`, which requires:
+  - Caller must have an interactive user session (JWT or cookie). **API keys cannot create or manage API keys** (anti-recursion).
+  - Caller must be System, have `CanManageApiKeys == true` on their profile, possess the `can_manage_api_keys: "true"` claim, or be in a role listed in `IdentitySettings.ApiKeyAllowedRoles`.
+- **Dynamic Configuration Controls (`IdentitySettings`):**
+  - `EnableApiKeys`: Master toggle to enable/disable API key auth and management.
+  - `AllowUserApiKeyCreation`: When `false`, only System administrators can create keys.
+  - `ApiKeyAllowedRoles`: List of roles permitted to manage API keys.
+  - `MaxApiKeyLifetimeDays`: Upper bound on key lifetime (defaults to 365 days).
+  - `RequireKeyExpiration`: Forces callers to supply an explicit expiration date.
+  - `MaxKeysPerUser`: Quota on active non-expired, non-revoked keys per user (defaults to 5).
+- **Least-Privilege Scopes:** API keys can be provisioned with optional `Scopes` (e.g. `["catalog:read", "orders:write"]`).
 
 ### Host Integration
 
@@ -157,11 +169,11 @@ app.UseAuthorization();
 
 | Verb | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/` | Authenticated | Create API key (returns plaintext secret once) |
-| `GET` | `/` | Authenticated | List API keys for current user (or filter by `userId` for System) |
-| `GET` | `/{id}` | Authenticated | Get API key metadata by ID |
-| `DELETE` | `/{id}` | Authenticated | Revoke API key |
-| `POST` | `/{id}/revoke` | Authenticated | Revoke API key |
+| `POST` | `/` | ManageApiKeys | Create API key (returns plaintext secret once; interactive session required) |
+| `GET` | `/` | ManageApiKeys | List API keys for current user (or filter by `userId` for System) |
+| `GET` | `/{id}` | ManageApiKeys | Get API key metadata by ID |
+| `DELETE` | `/{id}` | ManageApiKeys | Revoke API key |
+| `POST` | `/{id}/revoke` | ManageApiKeys | Revoke API key |
 
 ### Users (`/api/v1/identity/users`)
 

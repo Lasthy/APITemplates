@@ -26,6 +26,7 @@ public interface IApiKeyService
         DefaultId userId,
         string name,
         DateTime? expiresAt = null,
+        IReadOnlyList<string>? scopes = null,
         CancellationToken ct = default);
 
     /// <summary>

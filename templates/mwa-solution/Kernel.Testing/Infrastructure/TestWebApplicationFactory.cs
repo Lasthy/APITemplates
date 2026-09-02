@@ -8,6 +8,7 @@ using Kernel.Encryption;
 using Kernel.Events;
 using Kernel.Notifications;
 using Kernel.Persistence;
+using Kernel.RateLimiting;
 using Kernel.Storage;
 using Kernel.Testing.Fakes;
 using Microsoft.AspNetCore.Authentication;
@@ -112,6 +113,13 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
                     dataSettings.SetValue("Provider", "InMemory");
                     dataSettings.SetValue("ConnectionString", DatabaseName);
                 }
+
+                var rateLimitingSettings = dynamicSettings.GetSection<RateLimitingSettings>();
+                if (rateLimitingSettings != null)
+                {
+                    rateLimitingSettings.AutoSave = false;
+                    rateLimitingSettings.SetValue("Enabled", false);
+                }
             }
 
             // Register test authentication scheme
@@ -138,11 +146,23 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
     /// </summary>
     public HttpClient CreateAuthenticatedClient(DefaultId userId, params string[] roles)
     {
+        return CreateAuthenticatedClient(userId, null, roles);
+    }
+
+    /// <summary>
+    /// Creates an <see cref="HttpClient"/> configured with test authentication headers for the specified user, claims, and roles.
+    /// </summary>
+    public HttpClient CreateAuthenticatedClient(DefaultId userId, IReadOnlyDictionary<string, string>? claims, params string[] roles)
+    {
         var client = CreateClient();
         client.DefaultRequestHeaders.Add("X-Test-UserId", userId.ToString());
         if (roles.Length > 0)
         {
             client.DefaultRequestHeaders.Add("X-Test-Roles", string.Join(",", roles));
+        }
+        if (claims is { Count: > 0 })
+        {
+            client.DefaultRequestHeaders.Add("X-Test-Claims", string.Join(";", claims.Select(kv => $"{kv.Key}={kv.Value}")));
         }
         return client;
     }
@@ -199,7 +219,8 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
 }
 
 /// <summary>
-/// Internal test authentication handler that authenticates requests using X-Test-UserId and X-Test-Roles headers.
+/// Internal test authentication handler that authenticates requests using X-Test-UserId and X-Test-Roles headers,
+/// or delegates to ApiKey and JwtBearer schemes when those headers are present.
 /// </summary>
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -211,42 +232,79 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     {
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue("X-Test-UserId", out var userIdValues))
+        if (Request.Headers.TryGetValue("X-Test-UserId", out var userIdValues))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
-        }
-
-        var userId = userIdValues.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return Task.FromResult(AuthenticateResult.NoResult());
-        }
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId)
-        };
-
-        if (Request.Headers.TryGetValue("X-Test-Roles", out var rolesValues))
-        {
-            var rolesStr = rolesValues.FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(rolesStr))
+            var userId = userIdValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(userId))
             {
-                var roles = rolesStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                foreach (var role in roles)
+                var claims = new List<Claim>
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
+                    new(ClaimTypes.NameIdentifier, userId),
+                    new("sub", userId)
+                };
+
+                if (Request.Headers.TryGetValue("X-Test-Roles", out var rolesValues))
+                {
+                    var rolesStr = rolesValues.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(rolesStr))
+                    {
+                        var roles = rolesStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        foreach (var role in roles)
+                        {
+                            claims.Add(new Claim(ClaimTypes.Role, role));
+                        }
+                    }
                 }
+
+                if (Request.Headers.TryGetValue("X-Test-Claims", out var claimsValues))
+                {
+                    foreach (var claimHeader in claimsValues)
+                    {
+                        if (!string.IsNullOrWhiteSpace(claimHeader))
+                        {
+                            var pairs = claimHeader.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            foreach (var pair in pairs)
+                            {
+                                var parts = pair.Split('=', 2);
+                                if (parts.Length == 2)
+                                {
+                                    claims.Add(new Claim(parts[0].Trim(), parts[1].Trim()));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                var identity = new ClaimsIdentity(claims, "TestScheme");
+                var principal = new ClaimsPrincipal(identity);
+                var ticket = new AuthenticationTicket(principal, "TestScheme");
+
+                return AuthenticateResult.Success(ticket);
             }
         }
 
-        var identity = new ClaimsIdentity(claims, "TestScheme");
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, "TestScheme");
+        // Delegate to ApiKey scheme if present
+        if (Request.Headers.ContainsKey("X-API-Key") || Request.Headers.ContainsKey("ApiKey"))
+        {
+            var apiKeyResult = await Context.AuthenticateAsync("ApiKey");
+            if (apiKeyResult.Succeeded)
+            {
+                return apiKeyResult;
+            }
+        }
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        // Delegate to Bearer scheme if present
+        if (Request.Headers.ContainsKey("Authorization"))
+        {
+            var bearerResult = await Context.AuthenticateAsync("Bearer");
+            if (bearerResult.Succeeded)
+            {
+                return bearerResult;
+            }
+        }
+
+        return AuthenticateResult.NoResult();
     }
 }

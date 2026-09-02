@@ -58,6 +58,42 @@ public class IdentitySettings : DynamicSettingsSection
     /// </summary>
     public string SeedAdminPassword => TryGetValue<string>(nameof(SeedAdminPassword), out var val) && !string.IsNullOrEmpty(val) ? val : "Admin123!";
 
+    /// <summary>
+    /// Whether API key authentication and management is enabled globally.
+    /// Defaults to true.
+    /// </summary>
+    public bool EnableApiKeys => TryGetValue<bool>(nameof(EnableApiKeys), out var val) ? val : true;
+
+    /// <summary>
+    /// Whether non-system users with permitted profile or role can create their own API keys.
+    /// If false, only System administrators can create API keys.
+    /// Defaults to true.
+    /// </summary>
+    public bool AllowUserApiKeyCreation => TryGetValue<bool>(nameof(AllowUserApiKeyCreation), out var val) ? val : true;
+
+    /// <summary>
+    /// Additional roles permitted to create and manage API keys, in addition to System.
+    /// </summary>
+    public string[] ApiKeyAllowedRoles => TryGetValue<string[]>(nameof(ApiKeyAllowedRoles), out var val) && val != null ? val : [];
+
+    /// <summary>
+    /// Maximum allowed lifetime for an API key in days. Defaults to 365.
+    /// If null or &lt;= 0, no maximum lifetime is enforced.
+    /// </summary>
+    public int? MaxApiKeyLifetimeDays => TryGetValue<int>(nameof(MaxApiKeyLifetimeDays), out var val) && val > 0 ? val : 365;
+
+    /// <summary>
+    /// Whether an expiration date is strictly required when generating an API key.
+    /// Defaults to false.
+    /// </summary>
+    public bool RequireKeyExpiration => TryGetValue<bool>(nameof(RequireKeyExpiration), out var val) ? val : false;
+
+    /// <summary>
+    /// Maximum number of active (non-revoked, non-expired) API keys allowed per user.
+    /// Defaults to 5. Set to 0 to disable limit.
+    /// </summary>
+    public int MaxKeysPerUser => TryGetValue<int>(nameof(MaxKeysPerUser), out var val) && val >= 0 ? val : 5;
+
     public IdentitySettings(IJsonSerializer jsonSerializer, string? environment = null)
         : base("appsettings.Identity.json", jsonSerializer, environment) { }
 }

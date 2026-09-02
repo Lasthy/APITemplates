@@ -24,4 +24,9 @@ public static class IdentityClaimTypes
     /// Claim type for the name/label of the API key used to authenticate.
     /// </summary>
     public const string ApiKeyName = "apikey_name";
+
+    /// <summary>
+    /// Claim type indicating whether the user is explicitly authorized to manage API keys.
+    /// </summary>
+    public const string CanManageApiKeys = "can_manage_api_keys";
 }

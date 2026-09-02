@@ -54,6 +54,7 @@ public class IdentityModule : IModule
     {
         options.AddPolicy(IdentityPolicies.System, policy => policy.RequireRole(Kernel.Constants.Roles.System));
         options.AddPolicy(IdentityPolicies.Authenticated, policy => policy.RequireAuthenticatedUser());
+        options.AddPolicy(IdentityPolicies.ManageApiKeys, policy => policy.RequireAuthenticatedUser());
     }
 
     /// <inheritdoc/>
@@ -218,6 +219,7 @@ public class IdentityModule : IModule
             var claimsProperty = profileType.GetProperty(nameof(IProfile.Claims), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             var prefsTypeProperty = profileType.GetProperty(nameof(IProfile.PreferencesType), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             var onCreatedMethod = profileType.GetMethod(nameof(IProfile.OnUserCreatedAsync), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            var canManageApiKeysProperty = profileType.GetProperty(nameof(IProfile.CanManageApiKeys), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
 
             if (nameProperty == null || descProperty == null || isPublicProperty == null ||
                 rolesProperty == null || claimsProperty == null || onCreatedMethod == null)
@@ -231,6 +233,7 @@ public class IdentityModule : IModule
             var roles = (IReadOnlyList<string>)rolesProperty.GetValue(null)!;
             var claims = (IReadOnlyDictionary<string, string>)claimsProperty.GetValue(null)!;
             var prefsType = (Type?)prefsTypeProperty?.GetValue(null);
+            var canManageApiKeys = canManageApiKeysProperty != null && (bool)canManageApiKeysProperty.GetValue(null)!;
 
             Func<ProfileCreationContext, CancellationToken, Task> onCreated = (ctx, ct) =>
                 (Task)onCreatedMethod.Invoke(null, [ctx, ct])!;
@@ -242,7 +245,8 @@ public class IdentityModule : IModule
                 Roles: roles,
                 Claims: claims,
                 PreferencesType: prefsType,
-                OnUserCreated: onCreated));
+                OnUserCreated: onCreated,
+                CanManageApiKeys: canManageApiKeys));
         }
     }
 }

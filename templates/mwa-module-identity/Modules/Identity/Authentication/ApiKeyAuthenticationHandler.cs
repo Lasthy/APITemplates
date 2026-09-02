@@ -106,6 +106,15 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         claims.Add(new Claim(IdentityClaimTypes.ApiKeyId, apiKey.Id.ToString()));
         claims.Add(new Claim(IdentityClaimTypes.ApiKeyName, apiKey.Name));
 
+        // API keys must never inherit or possess API key management permissions
+        claims.RemoveAll(c => c.Type == IdentityClaimTypes.CanManageApiKeys);
+
+        // Add granted scopes as claims
+        foreach (var scope in apiKey.ScopeList)
+        {
+            claims.Add(new Claim("scope", scope));
+        }
+
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);

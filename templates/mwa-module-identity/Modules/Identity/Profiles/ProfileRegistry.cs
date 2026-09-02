@@ -11,6 +11,7 @@ namespace Identity.Profiles;
 /// <param name="Claims">Additional claims assigned to users created with this profile.</param>
 /// <param name="PreferencesType">Optional CLR type for preferences schema validation.</param>
 /// <param name="OnUserCreated">The creation hook delegate.</param>
+/// <param name="CanManageApiKeys">Whether users created with this profile are permitted to create and manage API keys.</param>
 public record ProfileDescriptor(
     string Name,
     string Description,
@@ -18,7 +19,8 @@ public record ProfileDescriptor(
     IReadOnlyList<string> Roles,
     IReadOnlyDictionary<string, string> Claims,
     Type? PreferencesType,
-    Func<ProfileCreationContext, CancellationToken, Task> OnUserCreated);
+    Func<ProfileCreationContext, CancellationToken, Task> OnUserCreated,
+    bool CanManageApiKeys = false);
 
 /// <summary>
 /// Singleton registry of all discovered <see cref="IProfile"/> implementations.
@@ -51,6 +53,12 @@ public class ProfileRegistry
     /// </summary>
     public bool IsPublic(string name) =>
         _profiles.TryGetValue(name, out var p) && p.IsPublic;
+
+    /// <summary>
+    /// Checks whether the specified profile exists and permits API key management.
+    /// </summary>
+    public bool CanManageApiKeys(string name) =>
+        _profiles.TryGetValue(name, out var p) && p.CanManageApiKeys;
 
     /// <summary>
     /// Gets all unique role names declared across all registered profiles.

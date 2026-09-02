@@ -11,7 +11,8 @@ namespace Identity.Features.ApiKeys;
 public record CreateApiKey(
     DefaultId UserId,
     string Name,
-    DateTime? ExpiresAt = null) : IRequest<ApiKeyCreatedDto>;
+    DateTime? ExpiresAt = null,
+    IReadOnlyList<string>? Scopes = null) : IRequest<ApiKeyCreatedDto>;
 
 /// <summary>
 /// Handles <see cref="CreateApiKey"/> by delegating to <see cref="IApiKeyService"/>.
@@ -32,6 +33,7 @@ public class CreateApiKeyHandler : IRequestHandler<CreateApiKey, ApiKeyCreatedDt
             request.UserId,
             request.Name,
             request.ExpiresAt,
+            request.Scopes,
             cancellationToken);
     }
 }

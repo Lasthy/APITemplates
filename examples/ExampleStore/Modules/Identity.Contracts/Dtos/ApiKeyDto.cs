@@ -11,7 +11,8 @@ public record ApiKeyDto(
     DateTime? ExpiresAt,
     DateTime? RevokedAt,
     DateTime? LastUsedAt,
-    DateTime CreatedAt)
+    DateTime CreatedAt,
+    IReadOnlyList<string>? Scopes = null)
 {
     /// <summary>
     /// Indicates whether the API key is currently valid and active (not revoked and not expired).

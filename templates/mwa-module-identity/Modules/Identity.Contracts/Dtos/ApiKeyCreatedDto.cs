@@ -10,4 +10,5 @@ public record ApiKeyCreatedDto(
     string KeyPrefix,
     DefaultId UserId,
     DateTime? ExpiresAt,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    IReadOnlyList<string>? Scopes = null);

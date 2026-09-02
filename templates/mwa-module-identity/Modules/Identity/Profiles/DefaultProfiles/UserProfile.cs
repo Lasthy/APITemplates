@@ -15,6 +15,7 @@ public class UserProfile : IProfile
     public static IReadOnlyList<string> Roles => [];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => null;
+    public static bool CanManageApiKeys => false;
 
     public static Task OnUserCreatedAsync(ProfileCreationContext context, CancellationToken ct)
         => Task.CompletedTask;

@@ -50,6 +50,19 @@ public class ApiKey : IAuditable
     /// </summary>
     public ApplicationUser? User { get; set; }
 
+    /// <summary>
+    /// Comma-separated list of granted scopes (e.g. "read,write", "identity:read").
+    /// If null or empty, the key inherits default permissions (excluding sensitive management claims).
+    /// </summary>
+    public string? Scopes { get; set; }
+
+    /// <summary>
+    /// Helper returning the parsed scopes as a read-only list.
+    /// </summary>
+    public IReadOnlyList<string> ScopeList => string.IsNullOrWhiteSpace(Scopes)
+        ? []
+        : Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     // ── IAuditable ─────────────────────────────────────────────────────────────
     public DateTime CreatedAt { get; set; }
     public DefaultId? CreatedBy { get; set; }

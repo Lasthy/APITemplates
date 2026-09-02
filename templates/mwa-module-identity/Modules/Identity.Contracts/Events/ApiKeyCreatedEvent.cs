@@ -8,4 +8,5 @@ namespace Identity.Contracts.Events;
 public record ApiKeyCreatedEvent(
     DefaultId KeyId,
     DefaultId UserId,
-    string Name) : Event;
+    string Name,
+    IReadOnlyList<string>? Scopes = null) : Event;

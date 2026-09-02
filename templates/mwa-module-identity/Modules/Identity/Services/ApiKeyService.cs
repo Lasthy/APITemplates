@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Identity.Configuration;
 using Identity.Contracts.Dtos;
 using Identity.Contracts.Events;
 using Identity.Entities;
@@ -19,18 +20,21 @@ public class ApiKeyService : IApiKeyService
 {
     private readonly IdentityModuleDbContext _dbContext;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IdentitySettings _identitySettings;
     private readonly IEventBus _eventBus;
     private readonly ILogger<ApiKeyService> _logger;
 
     public ApiKeyService(
         IdentityModuleDbContext dbContext,
         UserManager<ApplicationUser> userManager,
-        IEventBus _eventBus,
+        IdentitySettings identitySettings,
+        IEventBus eventBus,
         ILogger<ApiKeyService> logger)
     {
         _dbContext = dbContext;
         _userManager = userManager;
-        this._eventBus = _eventBus;
+        _identitySettings = identitySettings;
+        _eventBus = eventBus;
         _logger = logger;
     }
 
@@ -39,8 +43,14 @@ public class ApiKeyService : IApiKeyService
         DefaultId userId,
         string name,
         DateTime? expiresAt = null,
+        IReadOnlyList<string>? scopes = null,
         CancellationToken ct = default)
     {
+        if (!_identitySettings.EnableApiKeys)
+        {
+            return Result.Failure<ApiKeyCreatedDto>(new InvalidOperationException("API key creation is disabled."));
+        }
+
         if (string.IsNullOrWhiteSpace(name))
         {
             return Result.Failure<ApiKeyCreatedDto>(new ArgumentException("API key name is required.", nameof(name)));
@@ -52,11 +62,59 @@ public class ApiKeyService : IApiKeyService
             return Result.Failure<ApiKeyCreatedDto>(new InvalidOperationException($"User with ID '{userId}' was not found."));
         }
 
+        if (user.IsBanned)
+        {
+            return Result.Failure<ApiKeyCreatedDto>(new UnauthorizedAccessException("User is banned."));
+        }
+
+        // Expiration policy enforcement
+        if (_identitySettings.RequireKeyExpiration && expiresAt == null)
+        {
+            return Result.Failure<ApiKeyCreatedDto>(new ArgumentException("API key expiration date is required."));
+        }
+
+        if (expiresAt.HasValue && expiresAt.Value <= DateTime.UtcNow)
+        {
+            return Result.Failure<ApiKeyCreatedDto>(new ArgumentException("API key expiration date must be in the future."));
+        }
+
+        if (_identitySettings.MaxApiKeyLifetimeDays.HasValue)
+        {
+            var maxExpiry = DateTime.UtcNow.AddDays(_identitySettings.MaxApiKeyLifetimeDays.Value);
+            if (expiresAt.HasValue && expiresAt.Value > maxExpiry)
+            {
+                return Result.Failure<ApiKeyCreatedDto>(new ArgumentException(
+                    $"API key expiration cannot exceed {_identitySettings.MaxApiKeyLifetimeDays.Value} days (maximum: {maxExpiry:u})."));
+            }
+
+            if (!expiresAt.HasValue)
+            {
+                expiresAt = maxExpiry;
+            }
+        }
+
+        // Active key quota check
+        if (_identitySettings.MaxKeysPerUser > 0)
+        {
+            var activeKeys = await _dbContext.ApiKeys.CountAsync(
+                k => k.UserId == userId && k.RevokedAt == null && (k.ExpiresAt == null || k.ExpiresAt > DateTime.UtcNow), ct);
+
+            if (activeKeys >= _identitySettings.MaxKeysPerUser)
+            {
+                return Result.Failure<ApiKeyCreatedDto>(new InvalidOperationException(
+                    $"User has reached the maximum number of active API keys ({_identitySettings.MaxKeysPerUser})."));
+            }
+        }
+
         var randomBytes = RandomNumberGenerator.GetBytes(32);
         var hex = Convert.ToHexString(randomBytes).ToLowerInvariant();
         var rawKey = $"mwa_{hex}";
         var keyPrefix = rawKey[..8];
         var hash = HashKey(rawKey);
+
+        var scopesStr = scopes is { Count: > 0 }
+            ? string.Join(",", scopes.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()))
+            : null;
 
         var apiKey = new ApiKey
         {
@@ -66,13 +124,14 @@ public class ApiKeyService : IApiKeyService
             KeyPrefix = keyPrefix,
             UserId = userId,
             ExpiresAt = expiresAt,
+            Scopes = scopesStr,
             CreatedAt = DateTime.UtcNow
         };
 
         _dbContext.ApiKeys.Add(apiKey);
         await _dbContext.SaveChangesAsync(ct);
 
-        await _eventBus.PublishAsync(new ApiKeyCreatedEvent(apiKey.Id, userId, apiKey.Name), ct);
+        await _eventBus.PublishAsync(new ApiKeyCreatedEvent(apiKey.Id, userId, apiKey.Name, apiKey.ScopeList), ct);
 
         return Result.Success(new ApiKeyCreatedDto(
             apiKey.Id,
@@ -81,7 +140,8 @@ public class ApiKeyService : IApiKeyService
             apiKey.KeyPrefix,
             apiKey.UserId,
             apiKey.ExpiresAt,
-            apiKey.CreatedAt));
+            apiKey.CreatedAt,
+            apiKey.ScopeList));
     }
 
     /// <inheritdoc/>
@@ -89,6 +149,11 @@ public class ApiKeyService : IApiKeyService
         string apiKey,
         CancellationToken ct = default)
     {
+        if (!_identitySettings.EnableApiKeys)
+        {
+            return Result.Failure<ApiKeyValidationResult>(new UnauthorizedAccessException("API key authentication is disabled."));
+        }
+
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             return Result.Failure<ApiKeyValidationResult>(new ArgumentException("API key is required.", nameof(apiKey)));
@@ -187,7 +252,8 @@ public class ApiKeyService : IApiKeyService
             .AsNoTracking()
             .Where(k => k.UserId == userId)
             .OrderByDescending(k => k.CreatedAt)
-            .Select(k => new ApiKeyDto(
+            .Select(k => new
+            {
                 k.Id,
                 k.Name,
                 k.KeyPrefix,
@@ -195,10 +261,24 @@ public class ApiKeyService : IApiKeyService
                 k.ExpiresAt,
                 k.RevokedAt,
                 k.LastUsedAt,
-                k.CreatedAt))
+                k.CreatedAt,
+                k.Scopes
+            })
             .ToListAsync(ct);
 
-        return Result.Success<IEnumerable<ApiKeyDto>>(keys);
+        var dtos = keys.Select(k => new ApiKeyDto(
+            k.Id,
+            k.Name,
+            k.KeyPrefix,
+            k.UserId,
+            k.ExpiresAt,
+            k.RevokedAt,
+            k.LastUsedAt,
+            k.CreatedAt,
+            string.IsNullOrWhiteSpace(k.Scopes) ? null : k.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+            .ToList();
+
+        return Result.Success<IEnumerable<ApiKeyDto>>(dtos);
     }
 
     /// <inheritdoc/>
@@ -209,7 +289,8 @@ public class ApiKeyService : IApiKeyService
         var key = await _dbContext.ApiKeys
             .AsNoTracking()
             .Where(k => k.Id == keyId)
-            .Select(k => new ApiKeyDto(
+            .Select(k => new
+            {
                 k.Id,
                 k.Name,
                 k.KeyPrefix,
@@ -217,7 +298,9 @@ public class ApiKeyService : IApiKeyService
                 k.ExpiresAt,
                 k.RevokedAt,
                 k.LastUsedAt,
-                k.CreatedAt))
+                k.CreatedAt,
+                k.Scopes
+            })
             .FirstOrDefaultAsync(ct);
 
         if (key == null)
@@ -225,7 +308,18 @@ public class ApiKeyService : IApiKeyService
             return Result.Failure<ApiKeyDto>(new InvalidOperationException($"API key with ID '{keyId}' was not found."));
         }
 
-        return Result.Success(key);
+        var dto = new ApiKeyDto(
+            key.Id,
+            key.Name,
+            key.KeyPrefix,
+            key.UserId,
+            key.ExpiresAt,
+            key.RevokedAt,
+            key.LastUsedAt,
+            key.CreatedAt,
+            string.IsNullOrWhiteSpace(key.Scopes) ? null : key.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+        return Result.Success(dto);
     }
 
     /// <summary>
