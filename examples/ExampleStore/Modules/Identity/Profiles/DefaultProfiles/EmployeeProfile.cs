@@ -11,6 +11,9 @@ public class EmployeeProfile : IProfile
     public static string Name => IdentityProfiles.Employee;
     public static string Description => "Store employee with operational and fulfillment capabilities.";
     public static bool IsPublic => false;
+    public static IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [
+        ProfileRequirements.RequireRole(IdentityRoles.Admin)
+    ];
     public static IReadOnlyList<string> Roles => [IdentityRoles.Employee];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => null;

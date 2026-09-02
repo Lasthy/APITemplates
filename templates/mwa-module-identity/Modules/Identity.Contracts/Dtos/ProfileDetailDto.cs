@@ -9,4 +9,5 @@ public record ProfileDetailDto(
     bool IsPublic,
     IReadOnlyList<string> Roles,
     IReadOnlyDictionary<string, string> Claims,
-    string? PreferencesTypeName);
+    string? PreferencesTypeName,
+    IReadOnlyList<string>? Requirements = null);

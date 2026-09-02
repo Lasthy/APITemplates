@@ -11,6 +11,9 @@ public class SystemProfile : IProfile
     public static string Name => IdentityProfiles.System;
     public static string Description => "System administrator with full access.";
     public static bool IsPublic => false;
+    public static IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [
+        ProfileRequirements.RequireSystem()
+    ];
     public static IReadOnlyList<string> Roles => [IdentityRoles.System];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => null;

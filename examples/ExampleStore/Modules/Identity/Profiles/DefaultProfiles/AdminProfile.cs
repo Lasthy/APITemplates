@@ -11,6 +11,9 @@ public class AdminProfile : IProfile
     public static string Name => IdentityProfiles.Admin;
     public static string Description => "Store administrator with full store management and moderation capabilities.";
     public static bool IsPublic => false;
+    public static IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [
+        ProfileRequirements.RequireSystem()
+    ];
     public static IReadOnlyList<string> Roles => [IdentityRoles.Admin, IdentityRoles.Employee, IdentityRoles.Buyer];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => null;

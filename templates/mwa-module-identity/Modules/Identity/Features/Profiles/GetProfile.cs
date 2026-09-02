@@ -38,7 +38,8 @@ public class GetProfileHandler : IRequestHandler<GetProfile, ProfileDetailDto>
             IsPublic: profile.IsPublic,
             Roles: profile.Roles,
             Claims: profile.Claims,
-            PreferencesTypeName: profile.PreferencesType?.FullName);
+            PreferencesTypeName: profile.PreferencesType?.FullName,
+            Requirements: profile.CreationRequirements.Select(r => r.Description).ToList());
 
         return Task.FromResult(Result.Success(dto));
     }

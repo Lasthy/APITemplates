@@ -12,6 +12,9 @@ public class UserProfile : IProfile
     public static string Name => IdentityProfiles.User;
     public static string Description => "Standard user account with basic access.";
     public static bool IsPublic => true;
+    public static IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [
+        ProfileRequirements.Public
+    ];
     public static IReadOnlyList<string> Roles => [];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => null;

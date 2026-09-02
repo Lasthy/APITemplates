@@ -26,15 +26,18 @@ public class UsersController : ControllerBase
     private readonly IDispatcher _dispatcher;
     private readonly IScopeContext _scopeContext;
     private readonly ProfileRegistry _profileRegistry;
+    private readonly IProfileRequirementEvaluator _profileRequirementEvaluator;
 
     public UsersController(
         IDispatcher dispatcher,
         IScopeContext scopeContext,
-        ProfileRegistry profileRegistry)
+        ProfileRegistry profileRegistry,
+        IProfileRequirementEvaluator profileRequirementEvaluator)
     {
         _dispatcher = dispatcher;
         _scopeContext = scopeContext;
         _profileRegistry = profileRegistry;
+        _profileRequirementEvaluator = profileRequirementEvaluator;
     }
 
     #region Register
@@ -46,16 +49,30 @@ public class UsersController : ControllerBase
 
     /// <summary>
     /// Register a new user with a specified profile.
-    /// Anonymous users can only register with public profiles.
-    /// Authenticated system administrators can register users with any profile.
+    /// Creation requirements declared on the profile are evaluated against the caller's context.
+    /// System administrators have unrestricted profile creation privileges.
     /// </summary>
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest body, CancellationToken ct)
     {
-        // If not authenticated or not system, only allow public profiles
-        var isSystem = _scopeContext.IsSystem;
-        if (!isSystem && !_profileRegistry.IsPublic(body.ProfileName))
+        var profile = _profileRegistry.Get(body.ProfileName);
+        if (profile == null)
+        {
+            return Forbid();
+        }
+
+        var reqContext = new ProfileCreationRequirementContext
+        {
+            ScopeContext = _scopeContext,
+            Profile = profile,
+            Email = body.Email,
+            UserName = body.UserName,
+            Services = HttpContext.RequestServices
+        };
+
+        var evalResult = await _profileRequirementEvaluator.EvaluateAsync(reqContext, ct);
+        if (evalResult.IsFailure)
         {
             return Forbid();
         }

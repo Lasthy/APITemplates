@@ -34,6 +34,10 @@ Modules/
 │   │   └── IdentityModuleDbContext.cs            # IdentityDbContext with Ulid converters & ApiKeys DbSet
 │   ├── Profiles/
 │   │   ├── IProfile.cs                           # Profile contract (static abstract interface)
+│   │   ├── IProfileCreationRequirement.cs        # Creation requirement interface
+│   │   ├── ProfileCreationRequirementContext.cs  # Context for creation requirement evaluation
+│   │   ├── ProfileRequirements.cs                # Built-in requirements + fluent combinators
+│   │   ├── IProfileRequirementEvaluator.cs       # Service evaluating creation requirements
 │   │   ├── ProfileRegistry.cs                    # Singleton registry + ProfileDescriptor
 │   │   ├── ProfileCreationContext.cs             # Context for profile creation hooks
 │   │   └── DefaultProfiles/
@@ -70,7 +74,10 @@ public class TenantProfile : IProfile
 {
     public static string Name => "Tenant";
     public static string Description => "Tenant administrator with org-scoped access.";
-    public static bool IsPublic => true;
+    public static bool IsPublic => false;
+    public static IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [
+        ProfileRequirements.RequireRole("Admin")
+    ];
     public static IReadOnlyList<string> Roles => ["User", "TenantAdmin"];
     public static IReadOnlyDictionary<string, string> Claims => new Dictionary<string, string>();
     public static Type? PreferencesType => typeof(TenantPreferences);
@@ -86,7 +93,18 @@ public class TenantProfile : IProfile
 ```
 
 Key points:
-- **`IsPublic`**: If `true`, unauthenticated users can self-register with this profile. If `false`, only admins can create users with this profile.
+- **`IsPublic`**: Indicates whether unauthenticated users can self-register with this profile. If `CreationRequirements` is defined, this property reflects whether any requirement allows public access.
+- **`CreationRequirements`**: Requirements that must be satisfied by the caller to create a user with this profile. Evaluated automatically during registration via `IProfileRequirementEvaluator`. Defaults to `[ProfileRequirements.Public]` when `IsPublic` is `true`, or `[ProfileRequirements.RequireSystem()]` when `IsPublic` is `false`. Built-in requirements include:
+  - `ProfileRequirements.Public` / `AllowAnonymous()`: Public anonymous registration.
+  - `ProfileRequirements.RequireAuthenticated()`: Requires caller to be authenticated.
+  - `ProfileRequirements.RequireRole("Admin")` / `RequireAnyRole(...)`: Requires caller to have specific role(s) (or System).
+  - `ProfileRequirements.RequireAllRoles(...)`: Requires caller to have all specified roles (or System).
+  - `ProfileRequirements.RequireClaim("dept", "IT")`: Requires caller to possess specific claim (and optional value).
+  - `ProfileRequirements.RequireCallerProfile("TenantAdmin")`: Requires caller's profile claim to match.
+  - `ProfileRequirements.RequireSystem()`: Requires System super-user role.
+  - `ProfileRequirements.RequirePolicy("PolicyName")` / `RequirePolicy<TPolicy>()`: Evaluates Kernel `IAuthorizationPolicy`.
+  - `ProfileRequirements.Custom(predicate / asyncFunc)`: Custom lambda / delegate logic.
+  - `ProfileRequirements.Any(...)` and `ProfileRequirements.All(...)`: Logical OR / AND combinators.
 - **`Roles`**: Automatically assigned on user creation. Roles are seeded at startup by `RoleSeedWorker`.
 - **`Claims`**: Static claims assigned on user creation.
 - **`PreferencesType`**: If set, the user preferences JSON is validated against this type on update.

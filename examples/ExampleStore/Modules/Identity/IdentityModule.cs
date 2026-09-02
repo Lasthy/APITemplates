@@ -65,6 +65,7 @@ public class IdentityModule : IModule
         var profileRegistry = new ProfileRegistry();
         DiscoverAndRegisterProfiles(profileRegistry, typeof(IdentityModule).Assembly);
         services.AddSingleton(profileRegistry);
+        services.AddSingleton<IProfileRequirementEvaluator, ProfileRequirementEvaluator>();
 
         // ── Identity settings ─────────────────────────────────────────────────
         // The DynamicSettingsSection subclass (IdentitySettings) is auto-discovered
@@ -221,8 +222,9 @@ public class IdentityModule : IModule
             var prefsTypeProperty = profileType.GetProperty(nameof(IProfile.PreferencesType), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             var onCreatedMethod = profileType.GetMethod(nameof(IProfile.OnUserCreatedAsync), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             var canManageApiKeysProperty = profileType.GetProperty(nameof(IProfile.CanManageApiKeys), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            var creationRequirementsProperty = profileType.GetProperty(nameof(IProfile.CreationRequirements), BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
 
-            if (nameProperty == null || descProperty == null || isPublicProperty == null ||
+            if (nameProperty == null || descProperty == null ||
                 rolesProperty == null || claimsProperty == null || onCreatedMethod == null)
             {
                 continue;
@@ -230,11 +232,12 @@ public class IdentityModule : IModule
 
             var name = (string)nameProperty.GetValue(null)!;
             var description = (string)descProperty.GetValue(null)!;
-            var isPublic = (bool)isPublicProperty.GetValue(null)!;
+            var isPublic = isPublicProperty != null && (bool)isPublicProperty.GetValue(null)!;
             var roles = (IReadOnlyList<string>)rolesProperty.GetValue(null)!;
             var claims = (IReadOnlyDictionary<string, string>)claimsProperty.GetValue(null)!;
             var prefsType = (Type?)prefsTypeProperty?.GetValue(null);
             var canManageApiKeys = canManageApiKeysProperty != null && (bool)canManageApiKeysProperty.GetValue(null)!;
+            var creationRequirements = (IReadOnlyList<IProfileCreationRequirement>?)creationRequirementsProperty?.GetValue(null);
 
             Func<ProfileCreationContext, CancellationToken, Task> onCreated = (ctx, ct) =>
                 (Task)onCreatedMethod.Invoke(null, [ctx, ct])!;
@@ -247,7 +250,8 @@ public class IdentityModule : IModule
                 Claims: claims,
                 PreferencesType: prefsType,
                 OnUserCreated: onCreated,
-                CanManageApiKeys: canManageApiKeys));
+                CanManageApiKeys: canManageApiKeys,
+                CreationRequirements: creationRequirements));
         }
     }
 }

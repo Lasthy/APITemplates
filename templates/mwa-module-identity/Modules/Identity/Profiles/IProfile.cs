@@ -53,10 +53,20 @@ public interface IProfile
 
     /// <summary>
     /// If <c>true</c>, unauthenticated users can self-register with this profile
-    /// via the public registration endpoint. If <c>false</c>, only admin users
-    /// can create accounts with this profile.
+    /// via the public registration endpoint.
+    /// <para>
+    /// If <see cref="CreationRequirements"/> is defined, this property is ignored or reflects
+    /// whether any requirement permits public access.
+    /// </para>
     /// </summary>
-    static abstract bool IsPublic { get; }
+    static virtual bool IsPublic => false;
+
+    /// <summary>
+    /// Requirements that must be satisfied by the caller to create a user with this profile.
+    /// Defaults to empty, which falls back to <see cref="ProfileRequirements.Public"/> if <see cref="IsPublic"/> is <c>true</c>,
+    /// or <see cref="ProfileRequirements.RequireSystem"/> if <see cref="IsPublic"/> is <c>false</c>.
+    /// </summary>
+    static virtual IReadOnlyList<IProfileCreationRequirement> CreationRequirements => [];
 
     /// <summary>
     /// Roles automatically assigned to users created with this profile.
