@@ -190,6 +190,11 @@ public class ApiKeyService : IApiKeyService
             return Result.Failure<ApiKeyValidationResult>(new UnauthorizedAccessException("Associated user is banned."));
         }
 
+        if (key.User.IsDummy && key.User.DummyExpiresAt.HasValue && key.User.DummyExpiresAt.Value <= DateTime.UtcNow)
+        {
+            return Result.Failure<ApiKeyValidationResult>(new UnauthorizedAccessException("Associated dummy user has expired."));
+        }
+
         // Update LastUsedAt timestamp
         try
         {

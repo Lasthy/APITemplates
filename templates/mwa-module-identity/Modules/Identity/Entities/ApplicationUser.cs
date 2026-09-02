@@ -44,9 +44,15 @@ public class ApplicationUser : IdentityUser<DefaultId>, IAuditable
 
     /// <summary>
     /// Whether this is a dummy user created by an admin for testing/impersonation.
-    /// Dummy users cannot authenticate via login — admin receives a token directly.
+    /// Dummy users cannot authenticate once expired, and are recycled on subsequent requests.
     /// </summary>
     public bool IsDummy { get; set; }
+
+    /// <summary>
+    /// Expiration timestamp for dummy users. Once expired, the dummy user cannot authenticate
+    /// and is eligible to be recycled when a new dummy user is requested.
+    /// </summary>
+    public DateTime? DummyExpiresAt { get; set; }
 
     // ── IAuditable ────────────────────────────────────────────────────────────
 

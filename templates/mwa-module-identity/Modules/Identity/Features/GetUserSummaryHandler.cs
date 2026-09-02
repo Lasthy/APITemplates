@@ -36,6 +36,7 @@ public class GetUserSummaryHandler : IRequestHandler<GetUserSummary, UserDto>
             ProfileName: user.ProfileName,
             IsBanned: user.IsBanned,
             IsDummy: user.IsDummy,
-            CreatedAt: user.CreatedAt));
+            CreatedAt: user.CreatedAt,
+            DummyExpiresAt: user.DummyExpiresAt));
     }
 }

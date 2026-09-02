@@ -94,6 +94,17 @@ public class IdentitySettings : DynamicSettingsSection
     /// </summary>
     public int MaxKeysPerUser => TryGetValue<int>(nameof(MaxKeysPerUser), out var val) && val >= 0 ? val : 5;
 
+    /// <summary>
+    /// Default lifetime for dummy users in minutes. Defaults to 1440 (24 hours / 1 day).
+    /// </summary>
+    public int DummyUserLifetimeMinutes => TryGetValue<int>(nameof(DummyUserLifetimeMinutes), out var val) && val > 0 ? val : 1440;
+
+    /// <summary>
+    /// Whether to recycle expired dummy users when creating a new dummy user instead of accumulating records.
+    /// Defaults to true.
+    /// </summary>
+    public bool RecycleDummyUsers => TryGetValue<bool>(nameof(RecycleDummyUsers), out var val) ? val : true;
+
     public IdentitySettings(IJsonSerializer jsonSerializer, string? environment = null)
         : base("appsettings.Identity.json", jsonSerializer, environment) { }
 }

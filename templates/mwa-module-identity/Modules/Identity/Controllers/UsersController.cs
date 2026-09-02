@@ -98,10 +98,11 @@ public class UsersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? profile = null,
+        [FromQuery] bool? isDummy = null,
         CancellationToken ct = default)
     {
         var result = await _dispatcher.DispatchAsync(
-            new GetUsers(page, pageSize, profile), ct);
+            new GetUsers(page, pageSize, profile, isDummy), ct);
 
         return result.Match<IActionResult>(
             success => Ok(success),
@@ -258,15 +259,23 @@ public class UsersController : ControllerBase
 
     #endregion
 
-    #region CreateDummy
+    #region Dummy
 
     /// <summary>
-    /// Create a dummy user cloning the roles/claims of the specified user (System role only).
-    /// Returns a JWT for the dummy user.
+    /// Dummy user creation request options.
+    /// </summary>
+    public record CreateDummyUserRequest(int? LifetimeMinutes = null);
+
+    /// <summary>
+    /// Create or recycle a dummy user cloning the roles/claims of the specified user (System role only).
+    /// Returns credentials and initial authentication tokens (<see cref="Identity.Contracts.Dtos.DummyUserDto"/>).
     /// </summary>
     [HttpPost("{id}/dummy")]
     [AuthorizePolicy<SystemPolicy>]
-    public async Task<IActionResult> CreateDummy([FromRoute] DefaultId id, CancellationToken ct)
+    public async Task<IActionResult> CreateDummy(
+        [FromRoute] DefaultId id,
+        [FromBody] CreateDummyUserRequest? body = null,
+        CancellationToken ct = default)
     {
         if (_scopeContext.UserId == null)
         {
@@ -274,10 +283,25 @@ public class UsersController : ControllerBase
         }
 
         var result = await _dispatcher.DispatchAsync(
-            new CreateDummyUser(id, _scopeContext.UserId.Value), ct);
+            new CreateDummyUser(id, _scopeContext.UserId.Value, body?.LifetimeMinutes), ct);
 
         return result.Match<IActionResult>(
             success => Ok(success),
+            failure => BadRequest(new { message = failure.Message }));
+    }
+
+    /// <summary>
+    /// Purge all expired dummy users and their associated tokens/keys (System role only).
+    /// </summary>
+    [HttpDelete("dummy/expired")]
+    [AuthorizePolicy<SystemPolicy>]
+    public async Task<IActionResult> PurgeExpiredDummies(CancellationToken ct = default)
+    {
+        var result = await _dispatcher.DispatchAsync(
+            new PurgeExpiredDummyUsers(), ct);
+
+        return result.Match<IActionResult>(
+            purged => Ok(new { purged }),
             failure => BadRequest(new { message = failure.Message }));
     }
 

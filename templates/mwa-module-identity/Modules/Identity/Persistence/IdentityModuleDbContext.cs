@@ -56,6 +56,8 @@ public class IdentityModuleDbContext : IdentityDbContext<ApplicationUser, Applic
 
             entity.HasIndex(e => e.ProfileName);
             entity.HasIndex(e => e.IsBanned);
+            entity.HasIndex(e => e.IsDummy);
+            entity.HasIndex(e => e.DummyExpiresAt);
         });
 
         builder.Entity<ApplicationRole>(entity =>

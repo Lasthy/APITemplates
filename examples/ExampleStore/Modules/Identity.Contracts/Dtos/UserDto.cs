@@ -11,4 +11,5 @@ public record UserDto(
     string ProfileName,
     bool IsBanned,
     bool IsDummy,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    DateTime? DummyExpiresAt = null);

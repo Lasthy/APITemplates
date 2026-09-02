@@ -61,12 +61,20 @@ public interface IUserService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Creates a dummy user cloning the roles and claims of the specified source user.
-    /// Returns a JWT for the dummy user directly (dummy users cannot authenticate via login).
+    /// Creates or recycles a dummy user cloning the roles and claims of the specified source user.
+    /// Returns credentials and initial authentication tokens for the dummy user.
     /// </summary>
-    Task<Result<AuthTokenDto>> CreateDummyUserAsync(
+    Task<Result<DummyUserDto>> CreateDummyUserAsync(
         DefaultId sourceUserId,
         DefaultId createdBy,
+        int? lifetimeMinutes = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Purges all expired dummy users and their associated tokens and API keys.
+    /// Returns the number of purged dummy users.
+    /// </summary>
+    Task<Result<int>> PurgeExpiredDummyUsersAsync(
         CancellationToken ct = default);
 
     /// <summary>

@@ -51,6 +51,7 @@ public class GetCurrentUserHandler : IRequestHandler<GetCurrentUser, UserDetailD
             IsBanned: user.IsBanned,
             IsDummy: user.IsDummy,
             PreferencesJson: user.PreferencesJson,
-            CreatedAt: user.CreatedAt));
+            CreatedAt: user.CreatedAt,
+            DummyExpiresAt: user.DummyExpiresAt));
     }
 }

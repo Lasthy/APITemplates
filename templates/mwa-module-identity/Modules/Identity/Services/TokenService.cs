@@ -40,6 +40,10 @@ public class TokenService : ITokenService
         if (user.IsDummy)
         {
             tokenClaims.Add(new Claim(IdentityClaimTypes.IsDummy, "true"));
+            if (user.DummyExpiresAt.HasValue)
+            {
+                tokenClaims.Add(new Claim(IdentityClaimTypes.DummyExpiresAt, user.DummyExpiresAt.Value.ToString("O")));
+            }
         }
 
         // Add roles as claims

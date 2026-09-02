@@ -10,7 +10,7 @@ namespace Identity.Features.Users;
 /// <summary>
 /// Query to get a paginated list of all users (admin only).
 /// </summary>
-public record GetUsers(int Page = 1, int PageSize = 20, string? ProfileFilter = null) : IRequest<IEnumerable<UserDto>>;
+public record GetUsers(int Page = 1, int PageSize = 20, string? ProfileFilter = null, bool? IsDummy = null) : IRequest<IEnumerable<UserDto>>;
 
 /// <summary>
 /// Handles <see cref="GetUsers"/> by querying the Identity database.
@@ -34,6 +34,11 @@ public class GetUsersHandler : IRequestHandler<GetUsers, IEnumerable<UserDto>>
             query = query.Where(u => u.ProfileName == request.ProfileFilter);
         }
 
+        if (request.IsDummy.HasValue)
+        {
+            query = query.Where(u => u.IsDummy == request.IsDummy.Value);
+        }
+
         var users = await query
             .OrderByDescending(u => u.CreatedAt)
             .Skip((request.Page - 1) * request.PageSize)
@@ -45,7 +50,8 @@ public class GetUsersHandler : IRequestHandler<GetUsers, IEnumerable<UserDto>>
                 u.ProfileName,
                 u.IsBanned,
                 u.IsDummy,
-                u.CreatedAt))
+                u.CreatedAt,
+                u.DummyExpiresAt))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IEnumerable<UserDto>>(users);

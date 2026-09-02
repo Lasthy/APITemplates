@@ -110,7 +110,8 @@ public class UserService : IUserService
         string password,
         CancellationToken ct = default)
     {
-        var user = await _userManager.FindByEmailAsync(email);
+        var user = await _userManager.FindByEmailAsync(email)
+            ?? await _userManager.FindByNameAsync(email);
         if (user == null)
         {
             return Result.Failure<AuthTokenDto>(
@@ -125,8 +126,11 @@ public class UserService : IUserService
 
         if (user.IsDummy)
         {
-            return Result.Failure<AuthTokenDto>(
-                new UnauthorizedAccessException("Dummy accounts cannot authenticate."));
+            if (user.DummyExpiresAt.HasValue && user.DummyExpiresAt.Value <= DateTime.UtcNow)
+            {
+                return Result.Failure<AuthTokenDto>(
+                    new UnauthorizedAccessException("Dummy account has expired."));
+            }
         }
 
         var isValid = await _userManager.CheckPasswordAsync(user, password);
@@ -158,6 +162,12 @@ public class UserService : IUserService
         {
             return Result.Failure<AuthTokenDto>(
                 new UnauthorizedAccessException("This account has been banned."));
+        }
+
+        if (storedToken.User.IsDummy && storedToken.User.DummyExpiresAt.HasValue && storedToken.User.DummyExpiresAt.Value <= DateTime.UtcNow)
+        {
+            return Result.Failure<AuthTokenDto>(
+                new UnauthorizedAccessException("Dummy account has expired."));
         }
 
         // Revoke the old refresh token
@@ -262,35 +272,127 @@ public class UserService : IUserService
     }
 
     /// <inheritdoc/>
-    public async Task<Result<AuthTokenDto>> CreateDummyUserAsync(
+    public async Task<Result<DummyUserDto>> CreateDummyUserAsync(
         DefaultId sourceUserId,
         DefaultId createdBy,
+        int? lifetimeMinutes = null,
         CancellationToken ct = default)
     {
         var sourceUser = await _userManager.FindByIdAsync(sourceUserId.ToString());
         if (sourceUser == null)
         {
-            return Result.Failure<AuthTokenDto>(
+            return Result.Failure<DummyUserDto>(
                 new InvalidOperationException($"Source user '{sourceUserId}' not found."));
         }
 
-        var dummyId = DefaultId.NewUlid();
-        var dummyUser = new ApplicationUser
+        if (sourceUser.IsBanned)
         {
-            Id = dummyId,
-            Email = $"dummy-{dummyId}@localhost",
-            UserName = $"dummy-{dummyId}",
-            ProfileName = sourceUser.ProfileName,
-            IsDummy = true,
-            CreatedBy = createdBy
-        };
+            return Result.Failure<DummyUserDto>(
+                new InvalidOperationException("Cannot create a dummy user cloning a banned user."));
+        }
 
-        var createResult = await _userManager.CreateAsync(dummyUser, $"Dummy!{Guid.NewGuid()}");
-        if (!createResult.Succeeded)
+        if (sourceUser.IsDummy)
         {
-            var errors = string.Join("; ", createResult.Errors.Select(e => e.Description));
-            return Result.Failure<AuthTokenDto>(
-                new InvalidOperationException($"Failed to create dummy user: {errors}"));
+            return Result.Failure<DummyUserDto>(
+                new InvalidOperationException("Cannot create a dummy user cloning another dummy user."));
+        }
+
+        var durationMinutes = lifetimeMinutes is > 0
+            ? lifetimeMinutes.Value
+            : _identitySettings.DummyUserLifetimeMinutes;
+        var expiresAt = DateTime.UtcNow.AddMinutes(durationMinutes);
+        var password = GenerateSecurePassword();
+
+        ApplicationUser? dummyUser = null;
+        bool isRecycled = false;
+
+        if (_identitySettings.RecycleDummyUsers)
+        {
+            dummyUser = await _dbContext.Users
+                .Where(u => u.IsDummy && u.DummyExpiresAt != null && u.DummyExpiresAt <= DateTime.UtcNow)
+                .OrderBy(u => u.DummyExpiresAt)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        if (dummyUser != null)
+        {
+            isRecycled = true;
+
+            // 1. Clean up old roles
+            var oldRoles = await _userManager.GetRolesAsync(dummyUser);
+            if (oldRoles.Count > 0)
+            {
+                await _userManager.RemoveFromRolesAsync(dummyUser, oldRoles);
+            }
+
+            // 2. Clean up old claims
+            var oldClaims = await _userManager.GetClaimsAsync(dummyUser);
+            if (oldClaims.Count > 0)
+            {
+                await _userManager.RemoveClaimsAsync(dummyUser, oldClaims);
+            }
+
+            // 3. Revoke all existing refresh tokens
+            await RevokeAllRefreshTokensAsync(dummyUser.Id, ct);
+
+            // 4. Revoke all existing API keys
+            var activeKeys = await _dbContext.ApiKeys
+                .Where(k => k.UserId == dummyUser.Id && k.RevokedAt == null)
+                .ToListAsync(ct);
+            foreach (var key in activeKeys)
+            {
+                key.RevokedAt = DateTime.UtcNow;
+            }
+
+            // 5. Reset password
+            await _userManager.RemovePasswordAsync(dummyUser);
+            var addPwdResult = await _userManager.AddPasswordAsync(dummyUser, password);
+            if (!addPwdResult.Succeeded)
+            {
+                var errors = string.Join("; ", addPwdResult.Errors.Select(e => e.Description));
+                return Result.Failure<DummyUserDto>(
+                    new InvalidOperationException($"Failed to set password on recycled dummy user: {errors}"));
+            }
+
+            // 6. Update user metadata
+            dummyUser.ProfileName = sourceUser.ProfileName;
+            dummyUser.DummyExpiresAt = expiresAt;
+            dummyUser.CreatedBy = createdBy;
+            dummyUser.IsBanned = false;
+            dummyUser.BannedAt = null;
+            dummyUser.BannedBy = null;
+            dummyUser.BanReason = null;
+            dummyUser.PreferencesJson = null;
+
+            var updateResult = await _userManager.UpdateAsync(dummyUser);
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join("; ", updateResult.Errors.Select(e => e.Description));
+                return Result.Failure<DummyUserDto>(
+                    new InvalidOperationException($"Failed to update recycled dummy user: {errors}"));
+            }
+        }
+        else
+        {
+            var dummyId = DefaultId.NewUlid();
+            dummyUser = new ApplicationUser
+            {
+                Id = dummyId,
+                Email = $"dummy-{dummyId}@localhost",
+                UserName = $"dummy-{dummyId}",
+                ProfileName = sourceUser.ProfileName,
+                IsDummy = true,
+                DummyExpiresAt = expiresAt,
+                CreatedBy = createdBy
+            };
+
+            var createResult = await _userManager.CreateAsync(dummyUser, password);
+            if (!createResult.Succeeded)
+            {
+                var errors = string.Join("; ", createResult.Errors.Select(e => e.Description));
+                return Result.Failure<DummyUserDto>(
+                    new InvalidOperationException($"Failed to create dummy user: {errors}"));
+            }
         }
 
         // Copy roles from source user
@@ -308,11 +410,58 @@ public class UserService : IUserService
         }
 
         _logger.LogInformation(
-            "Dummy user {DummyUserId} created by {CreatedBy}, cloning user {SourceUserId}",
-            dummyId, createdBy, sourceUserId);
+            "Dummy user {DummyUserId} {Action} by {CreatedBy}, cloning user {SourceUserId}. ExpiresAt: {ExpiresAt}",
+            dummyUser.Id, isRecycled ? "recycled" : "created", createdBy, sourceUserId, expiresAt);
 
         // Generate tokens directly for the dummy user
-        return await GenerateTokensForUserAsync(dummyUser, ct);
+        var tokensResult = await GenerateTokensForUserAsync(dummyUser, ct);
+        if (tokensResult.IsFailure)
+        {
+            return Result.Failure<DummyUserDto>(tokensResult.Error!);
+        }
+
+        return Result.Success(new DummyUserDto(
+            Id: dummyUser.Id,
+            UserName: dummyUser.UserName!,
+            Email: dummyUser.Email!,
+            Password: password,
+            ExpiresAt: expiresAt,
+            Tokens: tokensResult.Value!,
+            IsRecycled: isRecycled));
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<int>> PurgeExpiredDummyUsersAsync(CancellationToken ct = default)
+    {
+        var expiredUsers = await _dbContext.Users
+            .Where(u => u.IsDummy && u.DummyExpiresAt != null && u.DummyExpiresAt <= DateTime.UtcNow)
+            .ToListAsync(ct);
+
+        if (expiredUsers.Count == 0)
+        {
+            return Result.Success(0);
+        }
+
+        foreach (var user in expiredUsers)
+        {
+            var tokens = await _dbContext.RefreshTokens
+                .Where(rt => rt.UserId == user.Id)
+                .ToListAsync(ct);
+            _dbContext.RefreshTokens.RemoveRange(tokens);
+
+            var apiKeys = await _dbContext.ApiKeys
+                .Where(k => k.UserId == user.Id)
+                .ToListAsync(ct);
+            _dbContext.ApiKeys.RemoveRange(apiKeys);
+
+            await _userManager.DeleteAsync(user);
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Purged {Count} expired dummy users", expiredUsers.Count);
+
+        return Result.Success(expiredUsers.Count);
     }
 
     /// <inheritdoc/>
@@ -425,5 +574,10 @@ public class UserService : IUserService
             AccessToken: accessToken,
             RefreshToken: refreshTokenStr,
             ExpiresAt: _tokenService.GetAccessTokenExpiration()));
+    }
+
+    private static string GenerateSecurePassword()
+    {
+        return $"Dummy!{Guid.NewGuid():N}!Aa1";
     }
 }

@@ -158,6 +158,15 @@ Server-to-server integrations, CI/CD tools, and background processes can authent
   - `MaxKeysPerUser`: Quota on active non-expired, non-revoked keys per user (defaults to 5).
 - **Least-Privilege Scopes:** API keys can be provisioned with optional `Scopes` (e.g. `["catalog:read", "orders:write"]`).
 
+### Dummy Users & Recycling
+
+System administrators can create temporary dummy users (`POST /api/v1/identity/users/{id}/dummy`) that clone the profile, roles, and claims of an existing source user for testing and troubleshooting:
+- **Temporary Lifetime:** Dummy users expire automatically after a configured duration (defaults to 1440 minutes / 24 hours via `IdentitySettings.DummyUserLifetimeMinutes`, or custom via optional `{ "lifetimeMinutes": 120 }` request body).
+- **Credentials Returned:** Returns `DummyUserDto` containing `UserName`, `Email`, `Password`, `ExpiresAt`, `Tokens` (`AuthTokenDto`), and `IsRecycled`.
+- **Authentication Enabled:** Dummy users can log in (`POST /api/v1/identity/auth/login`) with their temporary credentials while valid (`DummyExpiresAt > DateTime.UtcNow`). Expired dummy accounts are rejected on login, refresh, and API key auth.
+- **Automatic Recycling:** When requesting a new dummy user with `IdentitySettings.RecycleDummyUsers == true`, existing expired dummy users are recycled (password reset, old tokens/keys revoked, new source user roles and claims applied, expiration extended) rather than accumulating dead accounts.
+- **Purging:** Administrators can purge all expired dummy users at any time via `DELETE /api/v1/identity/users/dummy/expired`.
+
 ### Host Integration
 
 The Host's `Program.cs` must include authentication/authorization middleware. Add these lines after `app.UseKernel()`:
@@ -204,7 +213,8 @@ app.UseAuthorization();
 | `PUT` | `/{id}/preferences` | Self | Update preferences JSON |
 | `POST` | `/{id}/ban` | System | Ban user + revoke tokens |
 | `POST` | `/{id}/unban` | System | Unban user |
-| `POST` | `/{id}/dummy` | System | Create dummy clone of user |
+| `POST` | `/{id}/dummy` | System | Create or recycle dummy clone of user (returns credentials) |
+| `DELETE` | `/dummy/expired` | System | Purge expired dummy users |
 
 ### Profiles (`/api/v1/identity/profiles`)
 

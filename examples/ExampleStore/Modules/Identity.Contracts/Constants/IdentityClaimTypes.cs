@@ -16,6 +16,11 @@ public static class IdentityClaimTypes
     public const string IsDummy = "is_dummy";
 
     /// <summary>
+    /// Claim type indicating when a dummy account expires.
+    /// </summary>
+    public const string DummyExpiresAt = "dummy_expires_at";
+
+    /// <summary>
     /// Claim type for the ID of the API key used to authenticate.
     /// </summary>
     public const string ApiKeyId = "apikey_id";

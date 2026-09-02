@@ -14,4 +14,5 @@ public record UserDetailDto(
     bool IsBanned,
     bool IsDummy,
     string? PreferencesJson,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    DateTime? DummyExpiresAt = null);
