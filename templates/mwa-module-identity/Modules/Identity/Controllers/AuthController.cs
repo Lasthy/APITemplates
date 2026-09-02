@@ -1,5 +1,7 @@
+using Asp.Versioning;
 using Identity.Configuration;
 using Identity.Features.Auth;
+using Kernel.Authorization;
 using Kernel.Common;
 using Kernel.Context;
 using Kernel.Requests;
@@ -13,7 +15,8 @@ namespace Identity.Controllers;
 /// Authentication endpoints: login, refresh, logout, current user info.
 /// </summary>
 [ApiController]
-[Route("api/v1/identity/auth")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/identity/auth")]
 [ApiExplorerSettings(GroupName = "Identity")]
 [Tags("Auth")]
 public class AuthController : ControllerBase
@@ -31,6 +34,13 @@ public class AuthController : ControllerBase
         _scopeContext = scopeContext;
         _identitySettings = identitySettings;
     }
+
+    #region Login
+
+    /// <summary>
+    /// Login request body.
+    /// </summary>
+    public record LoginRequest(string Email, string Password);
 
     /// <summary>
     /// Authenticate with email and password. Returns JWT access token + refresh token.
@@ -55,6 +65,15 @@ public class AuthController : ControllerBase
             failure => Unauthorized(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region Refresh
+
+    /// <summary>
+    /// Refresh token request body.
+    /// </summary>
+    public record RefreshTokenRequest(string Token);
+
     /// <summary>
     /// Refresh the access token using a valid refresh token.
     /// </summary>
@@ -77,11 +96,15 @@ public class AuthController : ControllerBase
             failure => Unauthorized(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region Logout
+
     /// <summary>
     /// Logout: revoke all refresh tokens for the authenticated user and clear the auth cookie.
     /// </summary>
     [HttpPost("logout")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
         if (_scopeContext.UserId == null)
@@ -108,11 +131,15 @@ public class AuthController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region Me
+
     /// <summary>
     /// Get the currently authenticated user's details.
     /// </summary>
     [HttpGet("me")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> Me(CancellationToken ct)
     {
         if (_scopeContext.UserId == null)
@@ -128,11 +155,20 @@ public class AuthController : ControllerBase
             failure => NotFound(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region ChangePassword
+
+    /// <summary>
+    /// Change password request body.
+    /// </summary>
+    public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
     /// <summary>
     /// Change password for the currently authenticated user.
     /// </summary>
     [HttpPost("change-password")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> ChangePassword(
         [FromBody] ChangePasswordRequest body,
         CancellationToken ct)
@@ -153,6 +189,15 @@ public class AuthController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region ForgotPassword
+
+    /// <summary>
+    /// Forgot password request body.
+    /// </summary>
+    public record ForgotPasswordRequest(string Email);
+
     /// <summary>
     /// Initiate a password reset by sending a reset token event for the specified email.
     /// Always returns 200 OK to prevent email enumeration.
@@ -171,6 +216,15 @@ public class AuthController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region ResetPassword
+
+    /// <summary>
+    /// Reset password request body.
+    /// </summary>
+    public record ResetPasswordRequest(string Email, string Token, string NewPassword);
+
     /// <summary>
     /// Reset password using a valid reset token.
     /// </summary>
@@ -188,7 +242,9 @@ public class AuthController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    #endregion
+
+    #region Helpers
 
     private void SetAccessTokenCookie(string accessToken, DateTime expiresAt)
     {
@@ -200,31 +256,6 @@ public class AuthController : ControllerBase
             Expires = new DateTimeOffset(expiresAt, TimeSpan.Zero)
         });
     }
+
+    #endregion
 }
-
-// ── Request body models ───────────────────────────────────────────────────────
-
-/// <summary>
-/// Login request body.
-/// </summary>
-public record LoginRequest(string Email, string Password);
-
-/// <summary>
-/// Refresh token request body.
-/// </summary>
-public record RefreshTokenRequest(string Token);
-
-/// <summary>
-/// Change password request body.
-/// </summary>
-public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
-
-/// <summary>
-/// Forgot password request body.
-/// </summary>
-public record ForgotPasswordRequest(string Email);
-
-/// <summary>
-/// Reset password request body.
-/// </summary>
-public record ResetPasswordRequest(string Email, string Token, string NewPassword);

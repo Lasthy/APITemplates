@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Cysharp.Serialization.Json;
 using Identity.Controllers;
+using static Identity.Controllers.AuthController;
+using static Identity.Controllers.UsersController;
 using Identity.Contracts.Constants;
 using Identity.Contracts.Dtos;
 using Kernel.Testing.Infrastructure;

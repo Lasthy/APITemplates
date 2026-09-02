@@ -24,6 +24,8 @@ public class AuditController : ControllerBase
         _dispatcher = dispatcher;
     }
 
+    #region GetAuditEntries
+
     /// <summary>
     /// Retrieves a paginated list of structured audit log entries.
     /// Requires the <c>System</c> role.
@@ -41,4 +43,6 @@ public class AuditController : ControllerBase
             failure => BadRequest(failure.Message)
         );
     }
+
+    #endregion
 }

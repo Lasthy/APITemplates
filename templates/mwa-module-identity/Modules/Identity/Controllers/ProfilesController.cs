@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Identity.Contracts.Constants;
 using Identity.Features.Profiles;
 using Kernel.Common;
@@ -13,7 +14,8 @@ namespace Identity.Controllers;
 /// Profile listing endpoints.
 /// </summary>
 [ApiController]
-[Route("api/v1/identity/profiles")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/identity/profiles")]
 [ApiExplorerSettings(GroupName = "Identity")]
 [Tags("Profiles")]
 public class ProfilesController : ControllerBase
@@ -26,6 +28,8 @@ public class ProfilesController : ControllerBase
         _dispatcher = dispatcher;
         _scopeContext = scopeContext;
     }
+
+    #region GetProfiles
 
     /// <summary>
     /// List all registered profiles. Anonymous users see only public profiles.
@@ -43,6 +47,10 @@ public class ProfilesController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region GetProfile
+
     /// <summary>
     /// Get detailed information about a specific profile.
     /// </summary>
@@ -56,4 +64,6 @@ public class ProfilesController : ControllerBase
             success => Ok(success),
             failure => NotFound(new { message = failure.Message }));
     }
+
+    #endregion
 }

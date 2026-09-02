@@ -1,12 +1,16 @@
+using Asp.Versioning;
 using Identity.Contracts.Constants;
 using Identity.Features.Users;
 using Identity.Profiles;
+using Kernel.Authorization;
 using Kernel.Common;
+using Kernel.Constants;
 using Kernel.Context;
 using Kernel.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using AuthorizeAttribute = Microsoft.AspNetCore.Authorization.AuthorizeAttribute;
 
 namespace Identity.Controllers;
 
@@ -14,7 +18,8 @@ namespace Identity.Controllers;
 /// User management endpoints: register, list, get, update, ban/unban, preferences, dummy users.
 /// </summary>
 [ApiController]
-[Route("api/v1/identity/users")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/identity/users")]
 [ApiExplorerSettings(GroupName = "Identity")]
 [Tags("Users")]
 public class UsersController : ControllerBase
@@ -32,6 +37,13 @@ public class UsersController : ControllerBase
         _scopeContext = scopeContext;
         _profileRegistry = profileRegistry;
     }
+
+    #region Register
+
+    /// <summary>
+    /// User registration request body.
+    /// </summary>
+    public record RegisterRequest(string Email, string UserName, string Password, string ProfileName);
 
     /// <summary>
     /// Register a new user with a specified profile.
@@ -57,6 +69,10 @@ public class UsersController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region GetUsers
+
     /// <summary>
     /// Get a paginated list of all users (admin only).
     /// </summary>
@@ -76,11 +92,15 @@ public class UsersController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region GetUser
+
     /// <summary>
     /// Get a user's full details by ID (admin or self).
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> GetUser([FromRoute] DefaultId id, CancellationToken ct)
     {
         // Only admins or the user themselves can view details
@@ -98,11 +118,20 @@ public class UsersController : ControllerBase
             failure => NotFound(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region UpdateUser
+
+    /// <summary>
+    /// User update request body.
+    /// </summary>
+    public record UpdateUserRequest(string? Email, string? UserName);
+
     /// <summary>
     /// Update a user's email and/or username (admin or self).
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> UpdateUser(
         [FromRoute] DefaultId id,
         [FromBody] UpdateUserRequest body,
@@ -123,11 +152,20 @@ public class UsersController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region UpdatePreferences
+
+    /// <summary>
+    /// User preferences update request body.
+    /// </summary>
+    public record UpdatePreferencesRequest(string PreferencesJson);
+
     /// <summary>
     /// Update user preferences (self only).
     /// </summary>
     [HttpPut("{id}/preferences")]
-    [Authorize]
+    [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> UpdatePreferences(
         [FromRoute] DefaultId id,
         [FromBody] UpdatePreferencesRequest body,
@@ -145,6 +183,15 @@ public class UsersController : ControllerBase
             _ => NoContent(),
             failure => BadRequest(new { message = failure.Message }));
     }
+
+    #endregion
+
+    #region Ban
+
+    /// <summary>
+    /// Ban request body.
+    /// </summary>
+    public record BanRequest(string? Reason);
 
     /// <summary>
     /// Ban a user (admin only). Revokes all active refresh tokens.
@@ -169,6 +216,10 @@ public class UsersController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region Unban
+
     /// <summary>
     /// Unban a user (admin only).
     /// </summary>
@@ -189,12 +240,16 @@ public class UsersController : ControllerBase
             failure => BadRequest(new { message = failure.Message }));
     }
 
+    #endregion
+
+    #region CreateDummy
+
     /// <summary>
     /// Create a dummy user cloning the roles/claims of the specified user (System role only).
     /// Returns a JWT for the dummy user.
     /// </summary>
     [HttpPost("{id}/dummy")]
-    [Authorize(Roles = IdentityRoles.System)]
+    [Authorize(Roles = Roles.System)]
     public async Task<IActionResult> CreateDummy([FromRoute] DefaultId id, CancellationToken ct)
     {
         if (_scopeContext.UserId == null)
@@ -209,18 +264,6 @@ public class UsersController : ControllerBase
             success => Ok(success),
             failure => BadRequest(new { message = failure.Message }));
     }
+
+    #endregion
 }
-
-// ── Request body models ───────────────────────────────────────────────────────
-
-/// <summary>User registration request body.</summary>
-public record RegisterRequest(string Email, string UserName, string Password, string ProfileName);
-
-/// <summary>User update request body.</summary>
-public record UpdateUserRequest(string? Email, string? UserName);
-
-/// <summary>User preferences update request body.</summary>
-public record UpdatePreferencesRequest(string PreferencesJson);
-
-/// <summary>Ban request body.</summary>
-public record BanRequest(string? Reason);

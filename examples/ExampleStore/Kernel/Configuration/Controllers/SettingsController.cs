@@ -28,11 +28,17 @@ public class SettingsController : ControllerBase
         _dispatcher = dispatcher;
     }
 
+    #region GetSectionNames
+
     [HttpGet]
     public IActionResult GetSectionNames()
     {
         return Ok(_dynamicSettings.GetSectionNames());
     }
+
+    #endregion
+
+    #region GetSection
 
     [HttpGet("{sectionName}")]
     public async Task<IActionResult> GetSection([FromRoute] string sectionName, CancellationToken ct)
@@ -43,6 +49,10 @@ public class SettingsController : ControllerBase
             failure => BadRequest(failure.Message)
         );
     }
+
+    #endregion
+
+    #region UpdateSetting
 
     [HttpPut("{sectionName}/{key}")]
     public async Task<IActionResult> UpdateSetting(
@@ -57,4 +67,6 @@ public class SettingsController : ControllerBase
             failure => BadRequest(failure.Message)
         );
     }
+
+    #endregion
 }

@@ -24,6 +24,8 @@ public class HealthController : ControllerBase
         _healthService = healthService;
     }
 
+    #region Live
+
     /// <summary>
     /// Liveness probe to verify that the application process is running.
     /// </summary>
@@ -34,6 +36,10 @@ public class HealthController : ControllerBase
     {
         return Ok(new { status = nameof(HealthStatus.Healthy) });
     }
+
+    #endregion
+
+    #region Ready
 
     /// <summary>
     /// Readiness probe to verify that the application and its dependencies are ready to receive traffic.
@@ -53,6 +59,10 @@ public class HealthController : ControllerBase
 
         return Ok(new { status = status.ToString() });
     }
+
+    #endregion
+
+    #region GetReport
 
     /// <summary>
     /// Detailed health report across all modules and components.
@@ -75,6 +85,10 @@ public class HealthController : ControllerBase
             failure => BadRequest(failure.Message)
         );
     }
+
+    #endregion
+
+    #region GetModuleReport
 
     /// <summary>
     /// Detailed health report for a specific module.
@@ -100,4 +114,6 @@ public class HealthController : ControllerBase
                 : BadRequest(failure.Message)
         );
     }
+
+    #endregion
 }
