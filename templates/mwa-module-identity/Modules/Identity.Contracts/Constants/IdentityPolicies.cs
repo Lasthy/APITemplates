@@ -1,12 +1,17 @@
 namespace Identity.Contracts.Constants;
 
 /// <summary>
-/// Well-known authorization policy names registered by the Identity module.
+/// Well-known authorization policy names.
 /// </summary>
 public static class IdentityPolicies
 {
     /// <summary>
-    /// Policy requiring the <see cref="IdentityRoles.Admin"/> role.
+    /// Policy requiring an authenticated user.
     /// </summary>
-    public const string Admin = "IdentityAdmin";
+    public const string Authenticated = "Authenticated";
+
+    /// <summary>
+    /// Policy requiring the system super-user role.
+    /// </summary>
+    public const string System = "System";
 }

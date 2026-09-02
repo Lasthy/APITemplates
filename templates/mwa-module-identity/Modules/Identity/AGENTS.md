@@ -167,13 +167,13 @@ app.UseAuthorization();
 
 | Verb | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/register` | Anon (public) / Admin | Create user with profile |
-| `GET` | `/` | Admin | List users (paged, filterable) |
-| `GET` | `/{id}` | Admin / Self | User details |
-| `PUT` | `/{id}` | Admin / Self | Update email/username |
+| `POST` | `/register` | Anon (public) / System | Create user with profile |
+| `GET` | `/` | System | List users (paged, filterable) |
+| `GET` | `/{id}` | System / Self | User details |
+| `PUT` | `/{id}` | System / Self | Update email/username |
 | `PUT` | `/{id}/preferences` | Self | Update preferences JSON |
-| `POST` | `/{id}/ban` | Admin | Ban user + revoke tokens |
-| `POST` | `/{id}/unban` | Admin | Unban user |
+| `POST` | `/{id}/ban` | System | Ban user + revoke tokens |
+| `POST` | `/{id}/unban` | System | Unban user |
 | `POST` | `/{id}/dummy` | System | Create dummy clone of user |
 
 ### Profiles (`/api/v1/identity/profiles`)
@@ -266,3 +266,7 @@ Reference the module projects in `Host.csproj`:
 4. **Use `IScopeContext` for current user info in handlers.** Don't access `HttpContext` directly.
 5. **Use `IJsonSerializer`** for preferences serialization — never use `System.Text.Json.JsonSerializer` directly.
 6. **Change `JwtSecret` in production.** The default is a placeholder. Use a cryptographically random 64+ character string.
+7. **Default users have no role.** Standard users created via public registration have no roles assigned. The only built-in role is `Roles.System` (`"System"`).
+8. **By default only two authorization policies:** `Authenticated` and `System`. Prefer using strongly-typed Kernel authorization policies (`[AuthorizePolicy<AuthenticatedPolicy>]` and `[AuthorizePolicy<SystemPolicy>]`) over raw role strings or framework-level `[Authorize]`.
+9. **Kernel API versioning on controllers:** Always use `[ApiController]`, `[ApiVersion(1.0)]`, and `[Route("api/v{version:apiVersion}/...")]`.
+10. **Endpoint structure:** Enclose each action method in its own `#region ActionName` ... `#endregion` block. Place request body records directly on top of the action method inside the `#region`.

@@ -48,6 +48,27 @@ public class AuthenticatedPolicy : IAuthorizationPolicy
 }
 
 /// <summary>
+/// Built-in policy that checks if the user has the system super-user role.
+/// </summary>
+public class SystemPolicy : IAuthorizationPolicy
+{
+    public static string PolicyName => "System";
+    public string Name => PolicyName;
+
+    public Task<Result> AuthorizeAsync(IScopeContext context, object? resource, CancellationToken cancellationToken = default)
+    {
+        if (!context.IsAuthenticated)
+        {
+            return Task.FromResult(Result.Failure(new UnauthorizedAccessException("Authentication required.")));
+        }
+
+        return Task.FromResult(context.IsSystem
+            ? Result.Success()
+            : Result.Failure(new UnauthorizedAccessException("System role required.")));
+    }
+}
+
+/// <summary>
 /// Built-in policy that checks if the user has any of the specified roles.
 /// </summary>
 public class RolePolicy : IAuthorizationPolicy

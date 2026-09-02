@@ -65,7 +65,7 @@ public class IdentityApiIntegrationTests : IClassFixture<TestWebApplicationFacto
     public async Task RegisterAdmin_AsAdmin_ReturnsCreated()
     {
         var adminUserId = Ulid.NewUlid();
-        var adminClient = _factory.CreateAuthenticatedClient(adminUserId, IdentityRoles.Admin);
+        var adminClient = _factory.CreateAuthenticatedClient(adminUserId, IdentityRoles.System);
 
         var registerRequest = new RegisterRequest(
             Email: "new_admin@example.com",
@@ -86,7 +86,7 @@ public class IdentityApiIntegrationTests : IClassFixture<TestWebApplicationFacto
     public async Task RegisterEmployee_AsAdmin_ReturnsCreated()
     {
         var adminUserId = Ulid.NewUlid();
-        var adminClient = _factory.CreateAuthenticatedClient(adminUserId, IdentityRoles.Admin);
+        var adminClient = _factory.CreateAuthenticatedClient(adminUserId, IdentityRoles.System);
 
         var registerRequest = new RegisterRequest(
             Email: "new_employee@example.com",

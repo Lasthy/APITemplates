@@ -52,7 +52,8 @@ public class IdentityModule : IModule
     /// <inheritdoc/>
     public static void RegisterPolicies(AuthorizationOptions options)
     {
-        options.AddPolicy(IdentityPolicies.Admin, policy => policy.RequireRole(IdentityRoles.Admin));
+        options.AddPolicy(IdentityPolicies.System, policy => policy.RequireRole(Kernel.Constants.Roles.System));
+        options.AddPolicy(IdentityPolicies.Authenticated, policy => policy.RequireAuthenticatedUser());
     }
 
     /// <inheritdoc/>

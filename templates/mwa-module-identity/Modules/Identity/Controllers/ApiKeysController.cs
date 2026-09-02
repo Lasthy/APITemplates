@@ -54,10 +54,7 @@ public class ApiKeysController : ControllerBase
             return Unauthorized();
         }
 
-        var isElevated = _scopeContext.IsSystem ||
-                         _scopeContext.IsInRole(IdentityRoles.Admin) ||
-                         _scopeContext.IsInRole("Manager");
-
+        var isElevated = _scopeContext.IsSystem;
         var targetUserId = body.UserId ?? _scopeContext.UserId.Value;
 
         if (targetUserId != _scopeContext.UserId.Value && !isElevated)
@@ -94,9 +91,7 @@ public class ApiKeysController : ControllerBase
             return Unauthorized();
         }
 
-        var isElevated = _scopeContext.IsSystem ||
-                         _scopeContext.IsInRole(IdentityRoles.Admin) ||
-                         _scopeContext.IsInRole("Manager");
+        var isElevated = _scopeContext.IsSystem;
 
         if (userId.HasValue && userId.Value != _scopeContext.UserId.Value && !isElevated)
         {
@@ -136,9 +131,7 @@ public class ApiKeysController : ControllerBase
         return result.Match<IActionResult>(
             key =>
             {
-                var isElevated = _scopeContext.IsSystem ||
-                                 _scopeContext.IsInRole(IdentityRoles.Admin) ||
-                                 _scopeContext.IsInRole("Manager");
+                var isElevated = _scopeContext.IsSystem;
 
                 if (key.UserId != _scopeContext.UserId.Value && !isElevated)
                 {
@@ -169,9 +162,7 @@ public class ApiKeysController : ControllerBase
             return Unauthorized();
         }
 
-        var isElevated = _scopeContext.IsSystem ||
-                         _scopeContext.IsInRole(IdentityRoles.Admin) ||
-                         _scopeContext.IsInRole("Manager");
+        var isElevated = _scopeContext.IsSystem;
 
         var result = await _dispatcher.DispatchAsync(
             new RevokeApiKey(id, _scopeContext.UserId.Value, isElevated), ct);

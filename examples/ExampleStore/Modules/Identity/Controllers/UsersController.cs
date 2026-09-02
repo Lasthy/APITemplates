@@ -10,7 +10,6 @@ using Kernel.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using AuthorizeAttribute = Microsoft.AspNetCore.Authorization.AuthorizeAttribute;
 
 namespace Identity.Controllers;
 
@@ -48,15 +47,15 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Register a new user with a specified profile.
     /// Anonymous users can only register with public profiles.
-    /// Authenticated admins can register users with any profile.
+    /// Authenticated system administrators can register users with any profile.
     /// </summary>
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest body, CancellationToken ct)
     {
-        // If not authenticated or not admin, only allow public profiles
-        var isAdmin = _scopeContext.IsAuthenticated && _scopeContext.IsInRole(IdentityRoles.Admin);
-        if (!isAdmin && !_profileRegistry.IsPublic(body.ProfileName))
+        // If not authenticated or not system, only allow public profiles
+        var isSystem = _scopeContext.IsSystem;
+        if (!isSystem && !_profileRegistry.IsPublic(body.ProfileName))
         {
             return Forbid();
         }
@@ -74,10 +73,10 @@ public class UsersController : ControllerBase
     #region GetUsers
 
     /// <summary>
-    /// Get a paginated list of all users (admin only).
+    /// Get a paginated list of all users (system only).
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = IdentityRoles.Admin)]
+    [AuthorizePolicy<SystemPolicy>]
     public async Task<IActionResult> GetUsers(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -97,16 +96,16 @@ public class UsersController : ControllerBase
     #region GetUser
 
     /// <summary>
-    /// Get a user's full details by ID (admin or self).
+    /// Get a user's full details by ID (system or self).
     /// </summary>
     [HttpGet("{id}")]
     [AuthorizePolicy<AuthenticatedPolicy>]
     public async Task<IActionResult> GetUser([FromRoute] DefaultId id, CancellationToken ct)
     {
-        // Only admins or the user themselves can view details
-        var isAdmin = _scopeContext.IsInRole(IdentityRoles.Admin);
+        // Only system or the user themselves can view details
+        var isElevated = _scopeContext.IsSystem;
         var isSelf = _scopeContext.UserId == id;
-        if (!isAdmin && !isSelf)
+        if (!isElevated && !isSelf)
         {
             return Forbid();
         }
@@ -128,7 +127,7 @@ public class UsersController : ControllerBase
     public record UpdateUserRequest(string? Email, string? UserName);
 
     /// <summary>
-    /// Update a user's email and/or username (admin or self).
+    /// Update a user's email and/or username (system or self).
     /// </summary>
     [HttpPut("{id}")]
     [AuthorizePolicy<AuthenticatedPolicy>]
@@ -137,9 +136,9 @@ public class UsersController : ControllerBase
         [FromBody] UpdateUserRequest body,
         CancellationToken ct)
     {
-        var isAdmin = _scopeContext.IsInRole(IdentityRoles.Admin);
+        var isElevated = _scopeContext.IsSystem;
         var isSelf = _scopeContext.UserId == id;
-        if (!isAdmin && !isSelf)
+        if (!isElevated && !isSelf)
         {
             return Forbid();
         }
@@ -194,10 +193,10 @@ public class UsersController : ControllerBase
     public record BanRequest(string? Reason);
 
     /// <summary>
-    /// Ban a user (admin only). Revokes all active refresh tokens.
+    /// Ban a user (system only). Revokes all active refresh tokens.
     /// </summary>
     [HttpPost("{id}/ban")]
-    [Authorize(Roles = IdentityRoles.Admin)]
+    [AuthorizePolicy<SystemPolicy>]
     public async Task<IActionResult> Ban(
         [FromRoute] DefaultId id,
         [FromBody] BanRequest body,
@@ -221,10 +220,10 @@ public class UsersController : ControllerBase
     #region Unban
 
     /// <summary>
-    /// Unban a user (admin only).
+    /// Unban a user (system only).
     /// </summary>
     [HttpPost("{id}/unban")]
-    [Authorize(Roles = IdentityRoles.Admin)]
+    [AuthorizePolicy<SystemPolicy>]
     public async Task<IActionResult> Unban([FromRoute] DefaultId id, CancellationToken ct)
     {
         if (_scopeContext.UserId == null)
@@ -249,7 +248,7 @@ public class UsersController : ControllerBase
     /// Returns a JWT for the dummy user.
     /// </summary>
     [HttpPost("{id}/dummy")]
-    [Authorize(Roles = Roles.System)]
+    [AuthorizePolicy<SystemPolicy>]
     public async Task<IActionResult> CreateDummy([FromRoute] DefaultId id, CancellationToken ct)
     {
         if (_scopeContext.UserId == null)

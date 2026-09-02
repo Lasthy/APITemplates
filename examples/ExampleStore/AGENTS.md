@@ -442,3 +442,15 @@ This automatically scaffolds both `Modules/Orders` and `Modules/Orders.Contracts
 - **Features & Requests**: Place requests/commands/queries in `Features/` (or `{ModuleName}.Contracts/Requests/` if shared). Do **not** append `Request` to the class/record name; name them directly as verbs/actions (e.g., `GetOrders`, `CreateOrder`). The handler is named with a `Handler` suffix (e.g. `GetOrdersHandler`, `CreateOrderHandler`).
 - **Endpoints & Routing**: All API endpoints must start with `api/<version>/` (e.g., `api/v1/orders`). Group endpoints using `.WithTags("{ModuleName}").WithGroupName("{ModuleName}")`.
 - **Dependencies**: Modules depend on `Kernel` (and `Data` if using EF). Modules must never depend on other module implementations directly — reference the target module's companion `.Contracts` project and communicate via `IDispatcher` or `IEventBus`.
+
+### Controller & Endpoint Structure
+- **API Versioning**: Every API controller must be decorated with `[ApiController]`, `[ApiVersion(1.0)]`, and `[Route("api/v{version:apiVersion}/...")]`.
+- **Endpoint Regions**: On controllers, each action method must be enclosed in its own `#region ActionName` ... `#endregion` block.
+- **Request Body Records**: If an endpoint accepts a request body model/record, declare the record directly on top of the corresponding action method inside its `#region` block, rather than at the bottom or outside the controller class.
+
+### Authorization & Default Policies
+- **Default Roles**: By default, standard users have **no roles** assigned. The only built-in role is `Roles.System` (`"System"`), reserved for super-user operations.
+- **Default Policies**: By default, only two authorization policies exist:
+  - `Authenticated` (`AuthenticatedPolicy` / `IdentityPolicies.Authenticated`): Requires an authenticated user (`IScopeContext.IsAuthenticated`).
+  - `System` (`SystemPolicy` / `IdentityPolicies.System`): Requires the system super-user role (`IScopeContext.IsSystem`).
+- **Policy Usage Preference**: Always prefer using strongly-typed Kernel authorization policies (`[AuthorizePolicy<AuthenticatedPolicy>]` and `[AuthorizePolicy<SystemPolicy>]` on controllers, or `.RequireAuthorizationPolicy<AuthenticatedPolicy>()` and `.RequireAuthorizationPolicy<SystemPolicy>()` on Minimal API endpoints) over raw role strings or framework-level `[Authorize]` attributes.

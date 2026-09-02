@@ -34,9 +34,9 @@ public static class AuthorizationExtensions
         registry.Register(authenticatedPolicy);
         services.AddSingleton<IAuthorizationPolicy>(authenticatedPolicy);
 
-        var systemRolePolicy = new RolePolicy(Roles.System, Roles.System);
-        registry.Register(systemRolePolicy);
-        services.AddSingleton<IAuthorizationPolicy>(systemRolePolicy);
+        var systemPolicy = new SystemPolicy();
+        registry.Register(systemPolicy);
+        services.AddSingleton<IAuthorizationPolicy>(systemPolicy);
 
         // Scan assemblies
         foreach (var assembly in assemblies)
@@ -63,7 +63,8 @@ public static class AuthorizationExtensions
                         !t.IsGenericTypeDefinition &&
                         policyInterface.IsAssignableFrom(t) &&
                         t != typeof(RolePolicy) &&
-                        t != typeof(AuthenticatedPolicy))
+                        t != typeof(AuthenticatedPolicy) &&
+                        t != typeof(SystemPolicy))
             .ToList();
 
         if (registry == null)

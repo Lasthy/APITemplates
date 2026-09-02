@@ -753,8 +753,20 @@ Kernel/Host administrative operations that should only be accessible to system-l
 - **Identifiers** are always `DefaultId` (= `Ulid`). Never use `Guid`, `int`, or `string` for entity IDs.
 - **Namespaces** follow the folder structure.
 - **Features & Requests**: Place requests/commands/queries in a `Features/` folder. Do **not** append `Request` to the record/class name; name them directly as verbs/actions (e.g., `GetSettings`, `UpdateSettings`, `CreateOrder`). The handler is named with a `Handler` suffix (e.g. `GetSettingsHandler`, `UpdateSettingsHandler`, `CreateOrderHandler`).
-- **Endpoints & Routing**: All API endpoints must start with `api/<version>/` (e.g., `api/v1/kernel/settings`, `api/v1/orders`). Controllers use `[Route("api/v1/...")]`.
+- **Endpoints & Routing**: All API endpoints must start with `api/<version>/` (e.g., `api/v1/kernel/settings`, `api/v1/orders`). Group endpoints using `.WithTags("{ModuleName}").WithGroupName("{ModuleName}")`.
 - **Extension methods** for `WebApplicationBuilder` go in files named `WebApplicationBuilderExtensions.cs` within their feature folder.
+
+### Controller & Endpoint Structure
+- **API Versioning**: Every API controller must be decorated with `[ApiController]`, `[ApiVersion(1.0)]`, and `[Route("api/v{version:apiVersion}/...")]`.
+- **Endpoint Regions**: On controllers, each action method must be enclosed in its own `#region ActionName` ... `#endregion` block.
+- **Request Body Records**: If an endpoint accepts a request body model/record, declare the record directly on top of the corresponding action method inside its `#region` block, rather than at the bottom or outside the controller class.
+
+### Authorization & Default Policies
+- **Default Roles**: By default, standard users have **no roles** assigned. The only built-in role is `Roles.System` (`"System"`), reserved for super-user operations.
+- **Default Policies**: By default, only two authorization policies exist:
+  - `Authenticated` (`AuthenticatedPolicy` / `IdentityPolicies.Authenticated`): Requires an authenticated user (`IScopeContext.IsAuthenticated`).
+  - `System` (`SystemPolicy` / `IdentityPolicies.System`): Requires the system super-user role (`IScopeContext.IsSystem`).
+- **Policy Usage Preference**: Always prefer using strongly-typed Kernel authorization policies (`[AuthorizePolicy<AuthenticatedPolicy>]` and `[AuthorizePolicy<SystemPolicy>]` on controllers, or `.RequireAuthorizationPolicy<AuthenticatedPolicy>()` and `.RequireAuthorizationPolicy<SystemPolicy>()` on Minimal API endpoints) over raw role strings or framework-level `[Authorize]` attributes.
 
 ### Patterns
 - **Result pattern** for all operation returns — no throwing expected exceptions.

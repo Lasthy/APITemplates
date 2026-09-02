@@ -38,7 +38,7 @@ public class ProfilesController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetProfiles(CancellationToken ct)
     {
-        var includeNonPublic = _scopeContext.IsAuthenticated && _scopeContext.IsInRole(IdentityRoles.Admin);
+        var includeNonPublic = _scopeContext.IsSystem;
         var result = await _dispatcher.DispatchAsync(
             new GetProfiles(includeNonPublic), ct);
 
