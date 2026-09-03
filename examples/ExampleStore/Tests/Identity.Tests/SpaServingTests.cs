@@ -145,6 +145,59 @@ public class SpaServingTests : IClassFixture<TestWebApplicationFactory<Program>>
         settings.ShouldExcludePrefix("/docs");
         settings.ShouldExcludePrefix("/hubs");
         settings.ShouldExcludePrefix("/health");
+        settings.ShouldExcludePrefix("/files");
+    }
+
+    [Fact]
+    public void SpaAppOptions_DevServerCommandAndAutoStart_ShouldSetCorrectly()
+    {
+        // Arrange & Act
+        var app = new SpaAppOptions
+        {
+            Name = "Web",
+            BasePath = "/",
+            DevServerCommand = "pnpm run dev",
+            AutoStartDevServer = true
+        };
+
+        // Assert
+        app.ShouldHaveDevServerCommand("pnpm run dev");
+        app.ShouldAutoStartDevServer(true);
+    }
+
+    [Fact]
+    public async Task SpaProcessManager_WhenAutoStartDisabled_ShouldNotStart()
+    {
+        // Arrange
+        using var manager = new SpaProcessManager();
+        var app = new SpaAppOptions
+        {
+            Name = "Web",
+            BasePath = "/",
+            DevServerCommand = "npm run dev",
+            AutoStartDevServer = false
+        };
+
+        // Act & Assert (should complete immediately without attempting to launch)
+        await manager.StartDevServerAsync(app, Directory.GetCurrentDirectory());
+    }
+
+    [Fact]
+    public async Task SpaProcessManager_WhenSourceDirectoryMissing_ShouldGracefullySkip()
+    {
+        // Arrange
+        using var manager = new SpaProcessManager();
+        var app = new SpaAppOptions
+        {
+            Name = "Web",
+            BasePath = "/",
+            SourcePath = "NonExistentDirectoryForTestingXYZ",
+            DevServerCommand = "npm run dev",
+            AutoStartDevServer = true
+        };
+
+        // Act & Assert (should not throw)
+        await manager.StartDevServerAsync(app, Directory.GetCurrentDirectory());
     }
 
     [Fact]

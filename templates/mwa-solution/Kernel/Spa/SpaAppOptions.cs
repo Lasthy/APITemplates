@@ -63,6 +63,19 @@ public record SpaAppOptions
     public bool StripBasePathOnProxy { get; init; } = false;
 
     /// <summary>
+    /// Optional custom command to run the frontend development server in development mode
+    /// (e.g. "npm run dev", "pnpm dev", "yarn dev", "bun run dev").
+    /// </summary>
+    public string? DevServerCommand { get; init; }
+
+    /// <summary>
+    /// Whether to automatically execute <see cref="DevServerCommand"/> in <see cref="SourcePath"/>
+    /// when the backend starts in Development mode. Defaults to <c>false</c>.
+    /// The process tree is automatically terminated when the backend application stops.
+    /// </summary>
+    public bool AutoStartDevServer { get; init; } = false;
+
+    /// <summary>
     /// Normalizes a base path string so it starts with '/' and does not end with '/' unless it is root '/'.
     /// </summary>
     public static string NormalizeBasePath(string? path)

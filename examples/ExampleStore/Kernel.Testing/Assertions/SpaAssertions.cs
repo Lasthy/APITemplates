@@ -111,6 +111,30 @@ public static class SpaAssertions
     }
 
     /// <summary>
+    /// Asserts that the SPA option has the specified dev server command.
+    /// </summary>
+    public static SpaAppOptions ShouldHaveDevServerCommand(
+        this SpaAppOptions app,
+        string? expectedCommand)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        Assert.Equal(expectedCommand, app.DevServerCommand);
+        return app;
+    }
+
+    /// <summary>
+    /// Asserts that the SPA option has auto-start dev server enabled or disabled.
+    /// </summary>
+    public static SpaAppOptions ShouldAutoStartDevServer(
+        this SpaAppOptions app,
+        bool expectedValue = true)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        Assert.Equal(expectedValue, app.AutoStartDevServer);
+        return app;
+    }
+
+    /// <summary>
     /// Asserts that SPA settings is enabled.
     /// </summary>
     public static void ShouldBeEnabled(this SpaSettings settings)

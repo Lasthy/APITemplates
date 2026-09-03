@@ -43,6 +43,8 @@ public static class SpaExtensions
             EnableMultipleHttp2Connections = true
         }));
 
+        services.TryAddSingleton<SpaProcessManager>();
+
         return services;
     }
 
@@ -189,6 +191,22 @@ public static class SpaExtensions
         {
             ActivityTimeout = TimeSpan.FromSeconds(spaSettings.ProxyTimeoutSeconds)
         };
+
+        // ── Development: Auto-start dev server processes if configured ─────────
+        if (isDev)
+        {
+            var processManager = app.Services.GetService<SpaProcessManager>();
+            var lifetime = app.Services.GetService<IHostApplicationLifetime>();
+            if (processManager != null && lifetime != null)
+            {
+                processManager.RegisterWithLifetime(lifetime);
+            }
+
+            foreach (var spa in orderedApps.Where(a => a.AutoStartDevServer))
+            {
+                _ = processManager?.StartDevServerAsync(spa, environment.ContentRootPath);
+            }
+        }
 
         // ── Production: Mount static file providers for each SPA ───────────────
         var mountedStaticRoots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

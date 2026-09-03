@@ -16,7 +16,8 @@ public class SpaSettings : DynamicSettingsSection
         "/scalar",
         "/docs",
         "/hubs",
-        "/health"
+        "/health",
+        "/files"
     ];
 
     /// <inheritdoc />

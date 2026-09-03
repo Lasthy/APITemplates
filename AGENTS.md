@@ -512,24 +512,25 @@ A real-time notification abstraction backed by ASP.NET Core SignalR, configurabl
 > **Convention:** Inject `INotificationService` into event handlers, workers, or controllers to push real-time updates to users or groups. In tests, use `fixture.NotificationService` and assert with `fixture.NotificationService.ShouldHaveSentToUser(...)`.
  
 ### Single Page Application (SPA) Serving (`Kernel/Spa/`)
-Full-lifecycle SPA serving supporting **both single and multiple SPAs** (Host-level and Module-defined), dev server reverse proxying, and production static file delivery:
+Full-lifecycle SPA serving supporting **both single and multiple SPAs** (Host-level and Module-defined), dev server reverse proxying, optional background dev server auto-execution, and production static file delivery:
 
-- **`SpaAppOptions`** — Configuration model for an individual SPA: `Name`, `Owner` (e.g. `"Host"`, `"Identity"`), `BasePath` (normalized prefix e.g. `"/"`, `"/auth"`, `"/auth/admin"`), `DevServerUrl`, `SourcePath`, `DistPath`, `FallbackFile`, `Enabled`, and `StripBasePathOnProxy`.
+- **`SpaAppOptions`** — Configuration model for an individual SPA: `Name`, `Owner` (e.g. `"Host"`, `"Identity"`), `BasePath` (normalized prefix e.g. `"/"`, `"/auth"`, `"/auth/admin"`), `DevServerUrl`, `SourcePath`, `DistPath`, `FallbackFile`, `Enabled`, `StripBasePathOnProxy`, `DevServerCommand` (e.g. `"npm run dev"`), and `AutoStartDevServer` (`bool`, default: `false`).
 - **`SpaRegistry`** — Central singleton registry aggregating SPAs across the Host and all active modules. `GetOrderedApps()` automatically sorts SPAs by `BasePath.Length` descending so nested/specific prefixes (e.g. `/auth/admin` length 11) are evaluated before parent paths (`/auth` length 5) and root (`/` length 1).
-- **`SpaSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Spa"`). Loaded from `appsettings.Spa.json`. Contains `Enabled`, `ProxyTimeoutSeconds`, `ExcludedPrefixes` (defaults: `["/api", "/openapi", "/scalar", "/docs", "/hubs", "/health"]`), and `Apps` dictionary.
+- **`SpaProcessManager`** — Manages the lifecycle of frontend development servers when `AutoStartDevServer` is enabled. Cross-platform process launcher (cmd/sh) with TCP port probing to avoid duplicate instances, stdout/stderr forwarding to `ILogger`, and process tree termination via `IHostApplicationLifetime`.
+- **`SpaSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Spa"`). Loaded from `appsettings.Spa.json`. Contains `Enabled`, `ProxyTimeoutSeconds`, `ExcludedPrefixes` (defaults: `["/api", "/openapi", "/scalar", "/docs", "/hubs", "/health", "/files"]`), and `Apps` dictionary.
 - **`SpaHtmlTemplates`** — HTML diagnostic templates:
   - Development: Modern dark-themed offline diagnostic page displaying the exact SPA name, owner, base path, target URL, and `npm run dev` command when a dev server is unreachable.
   - Production: Informative warning page when `DistPath` compiled assets are missing.
 - **`SpaExtensions`** (`Kernel/Spa/Extensions/`):
-  - `services.AddSpaServices()` — Registers `SpaRegistry`, YARP `IHttpForwarder`, and high-performance pooled `HttpMessageInvoker`.
+  - `services.AddSpaServices()` — Registers `SpaRegistry`, `SpaProcessManager`, YARP `IHttpForwarder`, and high-performance pooled `HttpMessageInvoker`.
   - `services.AddModuleSpa(moduleName, options)` / `services.AddModuleSpa(moduleName, appName, options)` / `services.AddModuleSpas(...)` — Fluent helper for modules to register one or more owned SPAs during `IModule.Register`.
   - `app.UseSpa()` — Configures the HTTP pipeline:
-    - **Development**: Reverse-proxies unhandled requests under each SPA's `BasePath` to its configured `DevServerUrl`, forwarding HTTP requests and **WebSockets** (for Vite/Webpack HMR).
+    - **Development**: Optionally starts dev server commands if `AutoStartDevServer = true`, and reverse-proxies unhandled requests under each SPA's `BasePath` to its configured `DevServerUrl`, forwarding HTTP requests and **WebSockets** (for Vite/Webpack HMR).
     - **Production**: Mounts `UseDefaultFiles` and `UseStaticFiles` for each SPA's `DistPath` at its `BasePath`, and maps fallback to `FallbackFile` (`index.html`) for client-side navigation.
-    - **API Route Protection**: Requests matching `ExcludedPrefixes` (`/api`, `/openapi`, `/scalar`, `/docs`, `/hubs`, `/health`) are never intercepted by any SPA and return clean 404 responses.
-- **`SpaAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `registry.ShouldHaveApp(name)`, `registry.ShouldHaveAppWithBasePath(name, basePath)`, `registry.ShouldHaveAppCount(count)`, `registry.ShouldHaveEvaluationOrder(...)`, `settings.ShouldBeEnabled()`, `settings.ShouldExcludePrefix(prefix)`.
+    - **API Route Protection**: Requests matching `ExcludedPrefixes` (`/api`, `/openapi`, `/scalar`, `/docs`, `/hubs`, `/health`, `/files`) are never intercepted by any SPA and return clean 404 responses.
+- **`SpaAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `registry.ShouldHaveApp(name)`, `registry.ShouldHaveAppWithBasePath(name, basePath)`, `registry.ShouldHaveAppCount(count)`, `registry.ShouldHaveEvaluationOrder(...)`, `app.ShouldHaveDevServerCommand(command)`, `app.ShouldAutoStartDevServer()`, `settings.ShouldBeEnabled()`, `settings.ShouldExcludePrefix(prefix)`.
 
-> **Convention:** In development, each SPA runs its own dev server (e.g., `ClientApp` on 5173, `Modules/Identity/ClientApp/auth` on 5174). In production, run `npm run build` in each SPA's directory. Register module SPAs in `IModule.Register` via `services.AddModuleSpa(Name, ...)`. If a module is deactivated in `ActiveModules`, all of its SPAs are automatically excluded from the pipeline.
+> **Convention:** In development, each SPA can either run independently in a terminal or be auto-started by setting `"AutoStartDevServer": true` and `"DevServerCommand": "npm run dev"`. In production, run `npm run build` in each SPA's directory. Register module SPAs in `IModule.Register` via `services.AddModuleSpa(Name, ...)`. If a module is deactivated in `ActiveModules`, all of its SPAs are automatically excluded from the pipeline.
 
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
