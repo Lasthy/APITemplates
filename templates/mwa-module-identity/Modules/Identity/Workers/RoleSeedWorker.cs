@@ -54,6 +54,21 @@ public class RoleSeedWorker : BaseWorker
         // Seed default admin user if configured and no admin exists
         if (!string.IsNullOrWhiteSpace(identitySettings.SeedAdminEmail))
         {
+            var envName = identitySettings.EnvironmentName ??
+                          Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ??
+                          Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ??
+                          "Production";
+
+            var isDevelopment = string.Equals(envName, "Development", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(envName, "Test", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(envName, "Testing", StringComparison.OrdinalIgnoreCase);
+
+            if (!isDevelopment && identitySettings.IsDefaultSeedAdminPassword)
+            {
+                throw new InvalidOperationException(
+                    "In production environments, default seed admin credentials ('Admin123!') cannot be used. Specify a strong SeedAdminPassword via appsettings.Identity.json or IDENTITY__SEEDADMINPASSWORD, or set SeedAdminEmail to empty to disable automatic admin seeding.");
+            }
+
             var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
             var existingAdmin = await userManager.FindByEmailAsync(identitySettings.SeedAdminEmail);
 
@@ -69,7 +84,14 @@ public class RoleSeedWorker : BaseWorker
 
                 if (result.IsSuccess)
                 {
-                    _logger.LogInformation("Seeded admin user '{Email}'", identitySettings.SeedAdminEmail);
+                    if (identitySettings.IsDefaultSeedAdminPassword)
+                    {
+                        _logger.LogWarning("Seeded admin user '{Email}' with default development credentials. Change this password before deploying to production.", identitySettings.SeedAdminEmail);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Seeded admin user '{Email}'", identitySettings.SeedAdminEmail);
+                    }
                 }
                 else
                 {

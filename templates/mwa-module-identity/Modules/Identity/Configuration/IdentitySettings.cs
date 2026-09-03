@@ -12,10 +12,26 @@ public class IdentitySettings : DynamicSettingsSection
     public override string SectionName => "Identity";
 
     /// <summary>
+    /// Default development placeholder for JWT secret.
+    /// </summary>
+    public const string DefaultJwtSecret = "CHANGE-ME-use-a-64-char-random-key-in-production-00000000000000";
+
+    /// <summary>
+    /// Default development placeholder for seed admin password.
+    /// </summary>
+    public const string DefaultSeedAdminPassword = "Admin123!";
+
+    /// <summary>
     /// HMAC-SHA256 signing key for JWT access tokens.
     /// Must be at least 32 characters in production.
     /// </summary>
-    public string JwtSecret => TryGetValue<string>(nameof(JwtSecret), out var val) && !string.IsNullOrEmpty(val) ? val : "CHANGE-ME-use-a-64-char-random-key-in-production-00000000000000";
+    [Sensitive(AllowApiMutation = false)]
+    public string JwtSecret => TryGetValue<string>(nameof(JwtSecret), out var val) && !string.IsNullOrEmpty(val) ? val : DefaultJwtSecret;
+
+    /// <summary>
+    /// Whether the currently configured JwtSecret matches the default development placeholder.
+    /// </summary>
+    public bool IsDefaultJwtSecret => string.Equals(JwtSecret, DefaultJwtSecret, StringComparison.Ordinal);
 
     /// <summary>
     /// JWT token issuer claim.
@@ -56,7 +72,13 @@ public class IdentitySettings : DynamicSettingsSection
     /// <summary>
     /// Password for the seeded admin user.
     /// </summary>
-    public string SeedAdminPassword => TryGetValue<string>(nameof(SeedAdminPassword), out var val) && !string.IsNullOrEmpty(val) ? val : "Admin123!";
+    [Sensitive(AllowApiMutation = false)]
+    public string SeedAdminPassword => TryGetValue<string>(nameof(SeedAdminPassword), out var val) && !string.IsNullOrEmpty(val) ? val : DefaultSeedAdminPassword;
+
+    /// <summary>
+    /// Whether the currently configured SeedAdminPassword matches the default development placeholder.
+    /// </summary>
+    public bool IsDefaultSeedAdminPassword => string.Equals(SeedAdminPassword, DefaultSeedAdminPassword, StringComparison.Ordinal);
 
     /// <summary>
     /// Whether API key authentication and management is enabled globally.

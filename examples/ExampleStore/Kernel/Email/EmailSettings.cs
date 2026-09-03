@@ -35,6 +35,7 @@ public class EmailSettings : DynamicSettingsSection
     /// <summary>
     /// Optional password for SMTP authentication.
     /// </summary>
+    [Sensitive(AllowApiMutation = false)]
     public string? SmtpPassword =>
         TryGetValue<string>(nameof(SmtpPassword), out var val) ? val : null;
 
@@ -53,12 +54,12 @@ public class EmailSettings : DynamicSettingsSection
             : "noreply@example.com";
 
     /// <summary>
-    /// Default sender display name (From header, default: "ExampleStore").
+    /// Default sender display name (From header, default: "MyAPI").
     /// </summary>
     public string FromName =>
         TryGetValue<string>(nameof(FromName), out var val) && !string.IsNullOrWhiteSpace(val)
             ? val
-            : "ExampleStore";
+            : "MyAPI";
 
     public EmailSettings(IJsonSerializer jsonSerializer, string? environment = null)
         : base("appsettings.Email.json", jsonSerializer, environment)

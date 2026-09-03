@@ -19,6 +19,7 @@ public class DataSettings : DynamicSettingsSection
     /// <summary>
     /// The connection string for the database.
     /// </summary>
+    [Sensitive(AllowApiMutation = false)]
     public string ConnectionString => GetValue<string>(nameof(ConnectionString));
 
     public DataSettings(IJsonSerializer jsonSerializer, string? environment = null)

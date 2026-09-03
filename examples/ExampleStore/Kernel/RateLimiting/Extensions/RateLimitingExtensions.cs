@@ -131,7 +131,7 @@ public static class RateLimitingExtensions
                 }
                 else
                 {
-                    var clientIp = GetClientIpAddress(httpContext);
+                    var clientIp = GetClientIpAddress(httpContext, settings);
                     if (matchedOverride != null)
                     {
                         partitionKey = $"ip:{clientIp}:endpoint:{matchedOverrideKey}";
@@ -189,15 +189,18 @@ public static class RateLimitingExtensions
         return app;
     }
 
-    private static string GetClientIpAddress(HttpContext context)
+    private static string GetClientIpAddress(HttpContext context, RateLimitingSettings settings)
     {
-        var forwardedHeader = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedHeader))
+        if (settings.TrustForwardedHeaders)
         {
-            var firstIp = forwardedHeader.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstIp))
+            var forwardedHeader = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(forwardedHeader))
             {
-                return firstIp;
+                var firstIp = forwardedHeader.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(firstIp))
+                {
+                    return firstIp;
+                }
             }
         }
 

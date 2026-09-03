@@ -71,6 +71,16 @@ public class RateLimitingSettings : DynamicSettingsSection
         !TryGetValue<bool>(nameof(Enabled), out var val) || val;
 
     /// <summary>
+    /// Whether to trust the X-Forwarded-For header when extracting the client IP address.
+    /// Defaults to false to prevent rate limiting bypass via IP spoofing.
+    /// When false, context.Connection.RemoteIpAddress is used directly.
+    /// If true, ensure the application is behind a trusted reverse proxy that strips untrusted incoming forwarded headers.
+    /// Recommended alternative: configure ASP.NET Core's ForwardedHeadersMiddleware (app.UseForwardedHeaders()) with KnownProxies.
+    /// </summary>
+    public bool TrustForwardedHeaders =>
+        TryGetValue<bool>(nameof(TrustForwardedHeaders), out var val) && val;
+
+    /// <summary>
     /// Default rate limiting policy applied to unauthenticated requests (per IP).
     /// </summary>
     public RateLimitPolicyConfig GlobalPolicy =>

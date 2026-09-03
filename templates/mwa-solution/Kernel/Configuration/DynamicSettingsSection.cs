@@ -1,5 +1,6 @@
 using Kernel.Json;
 using System.Collections;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -73,6 +74,7 @@ public abstract class DynamicSettingsSection
 	private Dictionary<string, JsonElement> _envOptions = new(StringComparer.OrdinalIgnoreCase);
 	private Dictionary<string, JsonElement> _envVarOptions = new(StringComparer.OrdinalIgnoreCase);
 	private Dictionary<string, JsonElement> _merged = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Lazy<Dictionary<string, SensitiveAttribute>> _sensitiveProperties;
 
 	[JsonIgnore]
 	protected readonly IJsonSerializer JsonSerializer;
@@ -99,6 +101,7 @@ public abstract class DynamicSettingsSection
 		string? environment = null,
 		string? sectionName = null)
 	{
+		_sensitiveProperties = new Lazy<Dictionary<string, SensitiveAttribute>>(DiscoverSensitiveProperties);
 		Source = source;
 		JsonSerializer = jsonSerializer;
 		EnvironmentName = environment;
@@ -222,8 +225,73 @@ public abstract class DynamicSettingsSection
 
 	/// <summary>
 	/// Returns the merged settings as a JSON string.
+	/// When <paramref name="redactSensitive"/> is <c>true</c> (default), values for sensitive keys are replaced with <c>"******"</c>.
 	/// </summary>
-	public string GetAsJson() => JsonSerializer.Serialize(_merged);
+	public string GetAsJson(bool redactSensitive = true)
+	{
+		if (!redactSensitive)
+		{
+			return JsonSerializer.Serialize(_merged);
+		}
+
+		var redacted = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+		foreach (var (key, element) in _merged)
+		{
+			if (IsSensitiveKey(key))
+			{
+				redacted[key] = "******";
+			}
+			else
+			{
+				redacted[key] = element;
+			}
+		}
+
+		return JsonSerializer.Serialize(redacted);
+	}
+
+	/// <summary>
+	/// Determines whether the specified setting key is sensitive.
+	/// Default implementation checks properties decorated with <see cref="SensitiveAttribute"/>
+	/// and standard heuristic patterns (e.g., keys containing "Password", "Secret", "PrivateKey").
+	/// </summary>
+	public virtual bool IsSensitiveKey(string key)
+	{
+		if (_sensitiveProperties.Value.ContainsKey(key))
+			return true;
+
+		return key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
+		       key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
+		       key.Contains("PrivateKey", StringComparison.OrdinalIgnoreCase);
+	}
+
+	/// <summary>
+	/// Determines whether the specified setting key is permitted to be updated via API endpoints.
+	/// </summary>
+	public virtual bool IsKeyApiMutationAllowed(string key)
+	{
+		if (_sensitiveProperties.Value.TryGetValue(key, out var attr))
+		{
+			return attr.AllowApiMutation;
+		}
+
+		return !IsSensitiveKey(key);
+	}
+
+	protected virtual Dictionary<string, SensitiveAttribute> DiscoverSensitiveProperties()
+	{
+		var dict = new Dictionary<string, SensitiveAttribute>(StringComparer.OrdinalIgnoreCase);
+		var properties = GetType().GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+		foreach (var prop in properties)
+		{
+			var attr = prop.GetCustomAttribute<SensitiveAttribute>(inherit: true);
+			if (attr != null)
+			{
+				dict[prop.Name] = attr;
+			}
+		}
+		return dict;
+	}
 
 	/// <summary>
 	/// Resolves a file path across the current working directory, AppContext.BaseDirectory, and module directories.

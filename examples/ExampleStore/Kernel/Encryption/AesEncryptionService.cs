@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace Kernel.Encryption;
 
@@ -17,9 +18,13 @@ public class AesEncryptionService : IEncryptionService
     /// Initializes a new instance of <see cref="AesEncryptionService"/> using <see cref="EncryptionSettings"/>.
     /// The encryption key is evaluated dynamically from the settings.
     /// </summary>
-    public AesEncryptionService(EncryptionSettings settings)
+    public AesEncryptionService(EncryptionSettings settings, ILogger<AesEncryptionService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (settings.IsDefaultKey)
+        {
+            logger?.LogWarning("Using default insecure encryption key. This is only permitted in Development and Test environments.");
+        }
         _keyProvider = () => settings.GetKeyBytes();
     }
 

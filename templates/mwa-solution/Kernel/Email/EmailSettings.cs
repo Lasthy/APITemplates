@@ -35,6 +35,7 @@ public class EmailSettings : DynamicSettingsSection
     /// <summary>
     /// Optional password for SMTP authentication.
     /// </summary>
+    [Sensitive(AllowApiMutation = false)]
     public string? SmtpPassword =>
         TryGetValue<string>(nameof(SmtpPassword), out var val) ? val : null;
 

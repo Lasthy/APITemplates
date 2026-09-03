@@ -93,6 +93,23 @@ public class IdentityModule : IModule
 
         services.AddSingleton(identitySettings);
 
+        // ── Validate production security requirements ─────────────────────────
+        var environment = dynamicSettings?.Environment ??
+                          identitySettings.EnvironmentName ??
+                          Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ??
+                          Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ??
+                          "Production";
+
+        var isDevelopment = string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(environment, "Test", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(environment, "Testing", StringComparison.OrdinalIgnoreCase);
+
+        if (!isDevelopment && (identitySettings.IsDefaultJwtSecret || identitySettings.JwtSecret.Length < 32))
+        {
+            throw new InvalidOperationException(
+                "In production environments, a secure, non-default JwtSecret of at least 32 characters must be configured in appsettings.Identity.json or via the IDENTITY__JWTSECRET environment variable.");
+        }
+
         // ── Database context ──────────────────────────────────────────────────
         services.AddDbContext<IdentityModuleDbContext>((sp, options) =>
         {

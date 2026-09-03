@@ -37,6 +37,21 @@ public class UpdateSettingsHandler : IRequestHandler<UpdateSettings, bool>
             return Task.FromResult(Result.Failure<bool>(new InvalidOperationException($"Settings section '{request.SectionName}' is read-only.")));
         }
 
+        if (request.Value.ValueKind == JsonValueKind.String)
+        {
+            var strVal = request.Value.GetString();
+            if (string.Equals(strVal, "******", StringComparison.Ordinal) ||
+                string.Equals(strVal, "[REDACTED]", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(Result.Failure<bool>(new InvalidOperationException($"Cannot set masked placeholder value for setting '{request.Key}'.")));
+            }
+        }
+
+        if (section.IsSensitiveKey(request.Key) && !section.IsKeyApiMutationAllowed(request.Key))
+        {
+            return Task.FromResult(Result.Failure<bool>(new InvalidOperationException($"Modification of sensitive setting '{request.Key}' in section '{request.SectionName}' is prohibited via the management API.")));
+        }
+
         section.SetValue(request.Key, request.Value);
         return Task.FromResult(Result.Success(true));
     }
