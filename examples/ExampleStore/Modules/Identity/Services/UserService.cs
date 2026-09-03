@@ -42,11 +42,21 @@ public class UserService : IUserService
     }
 
     /// <inheritdoc/>
+    public Task<Result<ApplicationUser>> CreateUserAsync(
+        string email,
+        string userName,
+        string password,
+        string profileName,
+        CancellationToken ct = default) =>
+        CreateUserAsync(email, userName, password, profileName, null, ct);
+
+    /// <inheritdoc/>
     public async Task<Result<ApplicationUser>> CreateUserAsync(
         string email,
         string userName,
         string password,
         string profileName,
+        IReadOnlyDictionary<string, object>? additionalData,
         CancellationToken ct = default)
     {
         var profile = _profileRegistry.Get(profileName);
@@ -94,7 +104,8 @@ public class UserService : IUserService
         {
             User = user,
             UserManager = _userManager,
-            Services = _serviceProvider
+            Services = _serviceProvider,
+            AdditionalData = additionalData
         };
 
         await profile.OnUserCreated(context, ct);

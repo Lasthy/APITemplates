@@ -8,9 +8,14 @@ using Kernel.Requests;
 namespace Identity.Features.Users;
 
 /// <summary>
-/// Command to create a new user with a specified profile.
+/// Command to create a new user with a specified profile and optional additional data.
 /// </summary>
-public record CreateUser(string Email, string UserName, string Password, string ProfileName) : IRequest<UserDto>;
+public record CreateUser(
+    string Email,
+    string UserName,
+    string Password,
+    string ProfileName,
+    IReadOnlyDictionary<string, object>? AdditionalData = null) : IRequest<UserDto>;
 
 /// <summary>
 /// Handles <see cref="CreateUser"/> by creating the user via <see cref="IUserService"/>
@@ -36,6 +41,7 @@ public class CreateUserHandler : IRequestHandler<CreateUser, UserDto>
             request.UserName,
             request.Password,
             request.ProfileName,
+            request.AdditionalData,
             cancellationToken);
 
         if (result.IsFailure)
@@ -46,7 +52,7 @@ public class CreateUserHandler : IRequestHandler<CreateUser, UserDto>
         var user = result.Value!;
 
         await _eventBus.PublishAsync(
-            new UserCreatedEvent(user.Id, user.ProfileName, user.Email ?? string.Empty),
+            new UserCreatedEvent(user.Id, user.ProfileName, user.Email ?? string.Empty, request.AdditionalData),
             cancellationToken);
 
         return Result.Success(new UserDto(

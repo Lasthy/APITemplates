@@ -21,6 +21,18 @@ public interface IUserService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Creates a new user with the specified profile and additional data, applying all
+    /// profile-defined roles, claims, and creation hooks.
+    /// </summary>
+    Task<Result<ApplicationUser>> CreateUserAsync(
+        string email,
+        string userName,
+        string password,
+        string profileName,
+        IReadOnlyDictionary<string, object>? additionalData,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Authenticates a user by email and password.
     /// Returns an <see cref="AuthTokenDto"/> with JWT access token and refresh token.
     /// </summary>

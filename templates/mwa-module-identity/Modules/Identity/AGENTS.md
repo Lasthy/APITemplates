@@ -84,9 +84,10 @@ public class TenantProfile : IProfile
 
     public static async Task OnUserCreatedAsync(ProfileCreationContext context, CancellationToken ct)
     {
-        // Create a companion Tenant entity and assign its ID as a claim
+        // Create a companion Tenant entity using additional data passed during registration
+        var orgName = context.GetAdditionalData<string>("OrganizationName") ?? context.User.UserName;
         var tenantService = context.Services.GetRequiredService<ITenantService>();
-        var tenant = await tenantService.CreateAsync(context.User.Email, ct);
+        var tenant = await tenantService.CreateAsync(orgName, ct);
         await context.AddClaimAsync("TenantId", tenant.Id.ToString());
     }
 }
@@ -109,7 +110,8 @@ Key points:
 - **`Claims`**: Static claims assigned on user creation.
 - **`PreferencesType`**: If set, the user preferences JSON is validated against this type on update.
 - **`CanManageApiKeys`**: If `true`, users with this profile are permitted to create and manage their own API keys. Defaults to `false` (e.g. public `UserProfile` is `false`, `SystemProfile` is `true`).
-- **`OnUserCreatedAsync`**: Hook for side effects (creating companion entities, adding dynamic claims).
+- **`OnUserCreatedAsync`**: Hook for side effects (creating companion entities, adding dynamic claims). Receives `ProfileCreationContext` which provides `User`, `UserManager`, scoped `Services`, and `AdditionalData` (with helper methods `GetAdditionalData<T>()`, `TryGetAdditionalData<T>()`, and transient `Items` dictionary).
+- **`AdditionalData`**: Custom/additional data passed via `RegisterRequest`, `CreateUser`, and `CreateUserAsync`. Accessible in `ProfileCreationContext` and forwarded in `UserCreatedEvent`. Useful for companion entity payloads (Organization name, Address, Tenant ID, etc.).
 
 ### Profile Discovery
 

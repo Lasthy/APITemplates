@@ -111,4 +111,34 @@ public class UserRegistrationTests : ModuleTestBase<IdentityModule, IdentityModu
         var result2 = await Dispatcher.DispatchAsync(command2);
         result2.ShouldBeFailure();
     }
+
+    [Fact]
+    public async Task CreateUser_WithAdditionalData_ForwardsDataToEventAndHook()
+    {
+        var additionalData = new Dictionary<string, object>
+        {
+            ["Organization"] = "Acme Global",
+            ["TenantId"] = "01JTESTTENANT1234567890",
+            ["Tier"] = 2
+        };
+
+        var command = new CreateUser(
+            Email: "companion_test@example.com",
+            UserName: "companion_user",
+            Password: "Password123!",
+            ProfileName: IdentityProfiles.Buyer,
+            AdditionalData: additionalData);
+
+        var result = await Dispatcher.DispatchAsync(command);
+        var userDto = result.ShouldBeSuccess();
+
+        Assert.Equal("companion_test@example.com", userDto.Email);
+
+        // Check that event received AdditionalData
+        EventBus.ShouldHavePublished<UserCreatedEvent>(e =>
+            e.Email == "companion_test@example.com" &&
+            e.AdditionalData != null &&
+            e.AdditionalData.ContainsKey("Organization") &&
+            (string)e.AdditionalData["Organization"] == "Acme Global");
+    }
 }

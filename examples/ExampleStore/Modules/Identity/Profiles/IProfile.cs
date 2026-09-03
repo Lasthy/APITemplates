@@ -30,9 +30,10 @@ namespace Identity.Profiles;
 ///     
 ///     public static async Task OnUserCreatedAsync(ProfileCreationContext context, CancellationToken ct)
 ///     {
-///         // Create companion Tenant entity and assign its ID as a claim
+///         // Create companion Tenant entity using additional data passed during registration
+///         var orgName = context.GetAdditionalData&lt;string&gt;("OrganizationName") ?? context.User.UserName;
 ///         var tenantService = context.Services.GetRequiredService&lt;ITenantService&gt;();
-///         var tenant = await tenantService.CreateAsync(context.User.Email, ct);
+///         var tenant = await tenantService.CreateAsync(orgName, ct);
 ///         await context.AddClaimAsync("TenantId", tenant.Id.ToString());
 ///     }
 /// }
@@ -93,7 +94,9 @@ public interface IProfile
     /// </summary>
     /// <param name="context">
     /// Provides access to the created user, the <see cref="Microsoft.AspNetCore.Identity.UserManager{T}"/>,
-    /// and the DI <see cref="IServiceProvider"/> for resolving scoped services.
+    /// the DI <see cref="IServiceProvider"/> for resolving scoped services, and any additional data
+    /// passed by the caller via <see cref="ProfileCreationContext.AdditionalData"/> (with helper methods
+    /// like <see cref="ProfileCreationContext.GetAdditionalData{T}"/>).
     /// </param>
     /// <param name="ct">Cancellation token.</param>
     static abstract Task OnUserCreatedAsync(ProfileCreationContext context, CancellationToken ct);

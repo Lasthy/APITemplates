@@ -45,7 +45,12 @@ public class UsersController : ControllerBase
     /// <summary>
     /// User registration request body.
     /// </summary>
-    public record RegisterRequest(string Email, string UserName, string Password, string ProfileName);
+    public record RegisterRequest(
+        string Email,
+        string UserName,
+        string Password,
+        string ProfileName,
+        IReadOnlyDictionary<string, object>? AdditionalData = null);
 
     /// <summary>
     /// Register a new user with a specified profile.
@@ -68,7 +73,8 @@ public class UsersController : ControllerBase
             Profile = profile,
             Email = body.Email,
             UserName = body.UserName,
-            Services = HttpContext.RequestServices
+            Services = HttpContext.RequestServices,
+            AdditionalData = body.AdditionalData
         };
 
         var evalResult = await _profileRequirementEvaluator.EvaluateAsync(reqContext, ct);
@@ -78,7 +84,7 @@ public class UsersController : ControllerBase
         }
 
         var result = await _dispatcher.DispatchAsync(
-            new CreateUser(body.Email, body.UserName, body.Password, body.ProfileName), ct);
+            new CreateUser(body.Email, body.UserName, body.Password, body.ProfileName, body.AdditionalData), ct);
 
         return result.Match<IActionResult>(
             success => CreatedAtAction(nameof(GetUser), new { id = success.Id }, success),

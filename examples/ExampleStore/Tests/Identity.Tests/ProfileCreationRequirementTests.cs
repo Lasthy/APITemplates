@@ -424,5 +424,29 @@ public class ProfileCreationRequirementTests : IClassFixture<TestWebApplicationF
         Assert.Contains(profileDetail.Requirements, r => r.Contains("Admin", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Register_WithAdditionalData_PayloadAcceptedAndSucceeds()
+    {
+        var additionalData = new Dictionary<string, object>
+        {
+            ["OrganizationName"] = "Buyer Corp",
+            ["RegistrationSource"] = "WebPortal"
+        };
+
+        var request = new RegisterRequest(
+            Email: $"buyer_with_data_{Ulid.NewUlid()}@example.com",
+            UserName: $"buyer_data_{Ulid.NewUlid()}",
+            Password: "SecurePassword123!",
+            ProfileName: IdentityProfiles.Buyer,
+            AdditionalData: additionalData);
+
+        var response = await _client.PostAsJsonAsync("/api/v1/identity/users/register", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var user = await response.Content.ReadFromJsonAsync<UserDto>(_jsonOptions);
+        Assert.NotNull(user);
+        Assert.Equal(IdentityProfiles.Buyer, user.ProfileName);
+    }
+
     #endregion
 }
