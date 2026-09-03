@@ -14,6 +14,7 @@ public record UpdateUser(DefaultId UserId, string? Email, string? UserName) : IR
 /// Handles <see cref="UpdateUser"/> by updating user email and/or username.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class UpdateUserHandler : IRequestHandler<UpdateUser, bool>
 {
     private readonly UserManager<ApplicationUser> _userManager;

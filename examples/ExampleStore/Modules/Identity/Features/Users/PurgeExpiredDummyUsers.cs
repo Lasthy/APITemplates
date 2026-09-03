@@ -14,6 +14,7 @@ public record PurgeExpiredDummyUsers : IRequest<int>;
 /// Handles <see cref="PurgeExpiredDummyUsers"/> by deleting all expired dummy users.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class PurgeExpiredDummyUsersHandler : IRequestHandler<PurgeExpiredDummyUsers, int>
 {
     private readonly IUserService _userService;

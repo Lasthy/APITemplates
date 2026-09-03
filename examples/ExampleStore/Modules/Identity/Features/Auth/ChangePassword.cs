@@ -19,6 +19,7 @@ public record ChangePassword(
 /// revoking refresh tokens, and publishing <see cref="PasswordChangedEvent"/>.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class ChangePasswordHandler : IRequestHandler<ChangePassword, bool>
 {
     private readonly IUserService _userService;

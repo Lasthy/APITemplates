@@ -15,6 +15,7 @@ public record BanUser(DefaultId UserId, DefaultId BannedBy, string? Reason) : IR
 /// Handles <see cref="BanUser"/> by banning the user and publishing a <see cref="UserBannedEvent"/>.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class BanUserHandler : IRequestHandler<BanUser, bool>
 {
     private readonly IUserService _userService;

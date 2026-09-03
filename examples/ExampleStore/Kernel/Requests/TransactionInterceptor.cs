@@ -13,6 +13,11 @@ namespace Kernel.Requests;
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
 public class TransactionAttribute : RequestInterceptorAttribute
 {
+    public TransactionAttribute()
+    {
+        Order = 2; // Runs after authorization (-100), validation (-50), caching (-25), and logging (1)
+    }
+
     /// <summary>
     /// Transaction isolation level. Defaults to <see cref="IsolationLevel.ReadCommitted"/>.
     /// </summary>

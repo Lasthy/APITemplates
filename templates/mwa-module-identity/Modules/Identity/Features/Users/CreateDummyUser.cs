@@ -15,6 +15,7 @@ public record CreateDummyUser(DefaultId SourceUserId, DefaultId CreatedBy, int? 
 /// Handles <see cref="CreateDummyUser"/> by creating or recycling a dummy clone of the source user.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class CreateDummyUserHandler : IRequestHandler<CreateDummyUser, DummyUserDto>
 {
     private readonly IUserService _userService;

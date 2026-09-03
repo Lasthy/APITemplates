@@ -19,6 +19,7 @@ public record ResetPassword(
 /// revoking active sessions, and publishing <see cref="PasswordResetCompletedEvent"/>.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class ResetPasswordHandler : IRequestHandler<ResetPassword, bool>
 {
     private readonly IUserService _userService;

@@ -17,6 +17,7 @@ public record CreateUser(string Email, string UserName, string Password, string 
 /// and publishing a <see cref="UserCreatedEvent"/>.
 /// </summary>
 [Logging(Order = 1)]
+[Transaction(Order = 2)]
 public class CreateUserHandler : IRequestHandler<CreateUser, UserDto>
 {
     private readonly IUserService _userService;
