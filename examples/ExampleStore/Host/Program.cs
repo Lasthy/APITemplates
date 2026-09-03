@@ -1,6 +1,7 @@
 using Host.Extensions;
 using Kernel.Extensions;
 using Kernel.Modules;
+using Kernel.Spa.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,9 @@ app.UseModules();
 app.UseOpenApiViewer();
 
 app.UseHttpsRedirection();
+
+// Serve SPA applications (reverse proxy in Development, static files & fallback in Production)
+app.UseSpa();
 
 app.Run();
 

@@ -94,6 +94,7 @@ The executable ASP.NET web application. This is the composition root.
 | `appsettings.Versioning.json` | Dynamic settings for API versioning: default version, headers, query param, url segment flags. |
 | `appsettings.Storage.json` | Dynamic settings for file storage: provider, base path, base URL, max size, allowed extensions. |
 | `appsettings.Notifications.json` | Dynamic settings for real-time notifications: enabled flag, hub route path. |
+| `appsettings.Spa.json` | Dynamic settings for Single Page Application (SPA) serving: dev server proxying, static files, and multi-SPA configuration. |
 
 **Program.cs composition pattern:**
 ```csharp
@@ -105,6 +106,9 @@ app.UseKernel();          // Map /openapi/kernel.json
 app.UseData();            // Ensure databases and tables are created automatically on startup
 app.UseModules();         // Map module endpoints + /openapi/{module}.json + event types
 // Mount Scalar or Swagger UI (reads OpenApiViewer from appsettings.Instance.json)
+app.UseOpenApiViewer();
+app.UseHttpsRedirection();
+app.UseSpa();             // Serve SPAs: reverse proxy in Development, static files & fallback in Production
 ```
 
 **Configuration strategy:**
@@ -506,6 +510,26 @@ A real-time notification abstraction backed by ASP.NET Core SignalR, configurabl
 - **`NotificationAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `service.ShouldHaveSentToUser(userId)`, `service.ShouldHaveSentToGroup(group)`, `service.ShouldHaveSentBroadcast()`, `service.ShouldNotHaveSentNotifications()`, `service.ShouldHaveNotificationCount(count)`.
 
 > **Convention:** Inject `INotificationService` into event handlers, workers, or controllers to push real-time updates to users or groups. In tests, use `fixture.NotificationService` and assert with `fixture.NotificationService.ShouldHaveSentToUser(...)`.
+ 
+### Single Page Application (SPA) Serving (`Kernel/Spa/`)
+Full-lifecycle SPA serving supporting **both single and multiple SPAs** (Host-level and Module-defined), dev server reverse proxying, and production static file delivery:
+
+- **`SpaAppOptions`** — Configuration model for an individual SPA: `Name`, `Owner` (e.g. `"Host"`, `"Identity"`), `BasePath` (normalized prefix e.g. `"/"`, `"/auth"`, `"/auth/admin"`), `DevServerUrl`, `SourcePath`, `DistPath`, `FallbackFile`, `Enabled`, and `StripBasePathOnProxy`.
+- **`SpaRegistry`** — Central singleton registry aggregating SPAs across the Host and all active modules. `GetOrderedApps()` automatically sorts SPAs by `BasePath.Length` descending so nested/specific prefixes (e.g. `/auth/admin` length 11) are evaluated before parent paths (`/auth` length 5) and root (`/` length 1).
+- **`SpaSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Spa"`). Loaded from `appsettings.Spa.json`. Contains `Enabled`, `ProxyTimeoutSeconds`, `ExcludedPrefixes` (defaults: `["/api", "/openapi", "/scalar", "/docs", "/hubs", "/health"]`), and `Apps` dictionary.
+- **`SpaHtmlTemplates`** — HTML diagnostic templates:
+  - Development: Modern dark-themed offline diagnostic page displaying the exact SPA name, owner, base path, target URL, and `npm run dev` command when a dev server is unreachable.
+  - Production: Informative warning page when `DistPath` compiled assets are missing.
+- **`SpaExtensions`** (`Kernel/Spa/Extensions/`):
+  - `services.AddSpaServices()` — Registers `SpaRegistry`, YARP `IHttpForwarder`, and high-performance pooled `HttpMessageInvoker`.
+  - `services.AddModuleSpa(moduleName, options)` / `services.AddModuleSpa(moduleName, appName, options)` / `services.AddModuleSpas(...)` — Fluent helper for modules to register one or more owned SPAs during `IModule.Register`.
+  - `app.UseSpa()` — Configures the HTTP pipeline:
+    - **Development**: Reverse-proxies unhandled requests under each SPA's `BasePath` to its configured `DevServerUrl`, forwarding HTTP requests and **WebSockets** (for Vite/Webpack HMR).
+    - **Production**: Mounts `UseDefaultFiles` and `UseStaticFiles` for each SPA's `DistPath` at its `BasePath`, and maps fallback to `FallbackFile` (`index.html`) for client-side navigation.
+    - **API Route Protection**: Requests matching `ExcludedPrefixes` (`/api`, `/openapi`, `/scalar`, `/docs`, `/hubs`, `/health`) are never intercepted by any SPA and return clean 404 responses.
+- **`SpaAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `registry.ShouldHaveApp(name)`, `registry.ShouldHaveAppWithBasePath(name, basePath)`, `registry.ShouldHaveAppCount(count)`, `registry.ShouldHaveEvaluationOrder(...)`, `settings.ShouldBeEnabled()`, `settings.ShouldExcludePrefix(prefix)`.
+
+> **Convention:** In development, each SPA runs its own dev server (e.g., `ClientApp` on 5173, `Modules/Identity/ClientApp/auth` on 5174). In production, run `npm run build` in each SPA's directory. Register module SPAs in `IModule.Register` via `services.AddModuleSpa(Name, ...)`. If a module is deactivated in `ActiveModules`, all of its SPAs are automatically excluded from the pipeline.
 
 #### Testing Utilities (`Kernel.Testing/`)
 A companion class library providing test fakes, base test fixtures, and fluent assertion helpers for testing handlers, modules, and web hosts in an isolated in-memory environment.
@@ -529,6 +553,7 @@ A companion class library providing test fakes, base test fixtures, and fluent a
 - **`ApiVersioningAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSupportedApiVersions(versions)`, `ShouldHaveDeprecatedApiVersions(versions)`.
 - **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveFile(path)`, `ShouldHaveFile(path, bytes)`, `ShouldHaveFile(path, text)`, `ShouldNotHaveFile(path)`, `ShouldHaveDeleted(path)`, `ShouldBeEmpty()`, `ShouldHaveCount(count)`.
 - **`NotificationAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveSentToUser(userId)`, `ShouldHaveSentToGroup(group)`, `ShouldHaveSentBroadcast()`, `ShouldNotHaveSentNotifications()`, `ShouldHaveNotificationCount(count)`.
+- **`SpaAssertions`** (`Kernel.Testing/Assertions/`) — `ShouldHaveApp(name)`, `ShouldHaveAppWithBasePath(name, basePath)`, `ShouldHaveAppCount(count)`, `ShouldHaveEvaluationOrder(names)`, `ShouldHaveBasePath(path)`, `ShouldHaveDevServerUrl(url)`, `ShouldHaveOwner(owner)`, `ShouldHaveDistPath(path)`, `ShouldBeEnabled()`, `ShouldExcludePrefix(prefix)`.
 - **`KernelTestBase`** (`Kernel.Testing/Infrastructure/`) — Base test fixture providing an isolated, in-memory DI container, in-memory `KernelDbContext`, pre-configured fakes (`EventBus`, `ScopeContext`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`, `NotificationService`), `Dispatcher`, and scope execution helpers (`ExecuteScopeAsync`, `ExecuteDbContextAsync`).
 - **`ModuleTestBase<TModule>` / `ModuleTestBase<TModule, TDbContext>`** (`Kernel.Testing/Infrastructure/`) — Extends `KernelTestBase` to automatically register a module's services, request handlers, event handlers, validators, authorization policies, and health checks, and pre-seeds declared roles and ensures module tables are created.
 - **`TestWebApplicationFactory<TProgram>`** (`Kernel.Testing/Infrastructure/`) — Pre-configured `WebApplicationFactory` for full integration testing of the Host and active modules with an in-memory database and test fakes for `EventBus`, `EmailSender`, `CacheService`, `EncryptionService`, `FileStorage`, and `NotificationService`, plus a built-in test authentication handler (`CreateAuthenticatedClient(userId, roles)`).

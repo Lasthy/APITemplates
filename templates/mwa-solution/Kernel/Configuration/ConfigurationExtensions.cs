@@ -4,6 +4,7 @@ using Kernel.Encryption;
 using Kernel.Json;
 using Kernel.Messaging;
 using Kernel.Notifications;
+using Kernel.Spa;
 using Kernel.Storage;
 using Kernel.Versioning;
 using Microsoft.AspNetCore.Builder;
@@ -103,6 +104,9 @@ public static class ConfigurationExtensions
         var notificationSettings = new NotificationSettings(jsonSerializer, effectiveEnvironment);
         dynamicSettings.AddSection(notificationSettings);
 
+        var spaSettings = new SpaSettings(jsonSerializer, effectiveEnvironment);
+        dynamicSettings.AddSection(spaSettings);
+
         // Register all sections as singletons in DI
         builder.Services.AddSingleton(dynamicSettings);
         builder.Services.AddSingleton(hostSettings);
@@ -115,6 +119,7 @@ public static class ConfigurationExtensions
         builder.Services.AddSingleton(versioningSettings);
         builder.Services.AddSingleton(fileStorageSettings);
         builder.Services.AddSingleton(notificationSettings);
+        builder.Services.AddSingleton(spaSettings);
 
         return dynamicSettings;
     }

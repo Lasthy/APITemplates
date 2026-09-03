@@ -19,6 +19,7 @@ using Kernel.Persistence;
 using Kernel.Persistence.Extensions;
 using Kernel.RateLimiting.Extensions;
 using Kernel.Requests.Extensions;
+using Kernel.Spa.Extensions;
 using Kernel.Storage.Extensions;
 using Kernel.Validation.Extensions;
 using Kernel.Versioning.Extensions;
@@ -74,6 +75,7 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddEmail();
         builder.Services.AddSingleton<IPartitionManager, PartitionManager>();
         builder.Services.AddMessaging();
+        builder.Services.AddSpaServices();
 
         // ── Controllers & JSON Serialization ──────────────────────────────────
         builder.Services.AddControllers()
