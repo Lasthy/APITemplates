@@ -11,11 +11,16 @@ namespace Kernel.Storage;
 public class LocalFileStorage : IFileStorage
 {
     private readonly FileStorageSettings _settings;
+    private readonly IFileRegistry _registry;
     private readonly ILogger<LocalFileStorage> _logger;
 
-    public LocalFileStorage(FileStorageSettings settings, ILogger<LocalFileStorage>? logger = null)
+    public LocalFileStorage(
+        FileStorageSettings settings,
+        IFileRegistry registry,
+        ILogger<LocalFileStorage>? logger = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _logger = logger ?? NullLogger<LocalFileStorage>.Instance;
     }
 
@@ -139,11 +144,11 @@ public class LocalFileStorage : IFileStorage
     }
 
     /// <inheritdoc />
-    public Task<Result> DeleteAsync(string path, CancellationToken ct = default)
+    public async Task<Result> DeleteAsync(string path, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            return Task.FromResult(Result.Failure(new ArgumentException("File path cannot be empty.", nameof(path))));
+            return Result.Failure(new ArgumentException("File path cannot be empty.", nameof(path)));
         }
 
         try
@@ -152,7 +157,7 @@ public class LocalFileStorage : IFileStorage
             var (isSafe, fullPath) = ResolveSafeFullPath(normalizedPath);
             if (!isSafe)
             {
-                return Task.FromResult(Result.Failure(new ArgumentException("Invalid path: directory traversal attempt detected.", nameof(path))));
+                return Result.Failure(new ArgumentException("Invalid path: directory traversal attempt detected.", nameof(path)));
             }
 
             if (File.Exists(fullPath))
@@ -161,33 +166,48 @@ public class LocalFileStorage : IFileStorage
                 _logger.LogInformation("Deleted file at {StoragePath}", normalizedPath);
             }
 
-            return Task.FromResult(Result.Success());
+            await _registry.RevokeByPathAsync(normalizedPath, ct);
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete file at {Path}", path);
-            return Task.FromResult(Result.Failure(ex));
+            return Result.Failure(ex);
         }
     }
 
     /// <inheritdoc />
-    public Task<Result<string>> GetUrlAsync(string path, TimeSpan? expiry = null, CancellationToken ct = default)
+    public async Task<Result<string>> GetUrlAsync(string path, TimeSpan? expiry = null, CancellationToken ct = default)
     {
+        if (!_settings.EnablePublicAccess)
+        {
+            return Result.Failure<string>(new InvalidOperationException("Public file access is disabled in storage settings."));
+        }
+
         if (string.IsNullOrWhiteSpace(path))
         {
-            return Task.FromResult(Result.Failure<string>(new ArgumentException("File path cannot be empty.", nameof(path))));
+            return Result.Failure<string>(new ArgumentException("File path cannot be empty.", nameof(path)));
         }
 
         var normalizedPath = NormalizeRelativePath(path);
-        var baseUrl = _settings.BaseUrl;
-
-        if (string.IsNullOrWhiteSpace(baseUrl))
+        var (isSafe, fullPath) = ResolveSafeFullPath(normalizedPath);
+        if (!isSafe)
         {
-            return Task.FromResult(Result.Success<string>($"/{normalizedPath}"));
+            return Result.Failure<string>(new ArgumentException("Invalid path: directory traversal attempt detected.", nameof(path)));
         }
 
-        var url = $"{baseUrl.TrimEnd('/')}/{normalizedPath}";
-        return Task.FromResult(Result.Success<string>(url));
+        if (!File.Exists(fullPath))
+        {
+            return Result.Failure<string>(new FileNotFoundException($"File not found: {normalizedPath}", normalizedPath));
+        }
+
+        var regResult = await _registry.RegisterAsync(normalizedPath, expiry, ct);
+        if (regResult.IsFailure)
+        {
+            return Result.Failure<string>(regResult.Error!);
+        }
+
+        return Result.Success<string>($"/files/{regResult.Value}");
     }
 
     /// <inheritdoc />

@@ -185,6 +185,7 @@ public abstract class KernelTestBase : IAsyncLifetime, IDisposable
 
         services.AddSingleton(FileStorage);
         services.AddSingleton<IFileStorage>(FileStorage);
+        services.AddSingleton<IFileRegistry>(FileStorage.Registry);
 
         services.AddSingleton(NotificationService);
         services.AddSingleton<INotificationService>(NotificationService);

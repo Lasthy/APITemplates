@@ -367,12 +367,16 @@ A unified file and blob storage subsystem with a local filesystem provider, runt
 
 - **`IFileStorage`** — Abstraction for storing, retrieving, and deleting files and binary blobs (`UploadAsync`, `DownloadAsync`, `DeleteAsync`, `GetUrlAsync`, `ExistsAsync`).
 - **`LocalFileStorage`** — Default filesystem provider. Features directory auto-creation, path traversal attack prevention (`../`, `..\`), file size limit enforcement, and error isolation with railway-oriented `Result`.
-- **`FileStorageSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Storage"`). Loaded from `appsettings.Storage.json`. Exposes `Provider`, `BasePath`, `BaseUrl`, `MaxFileSizeBytes`, `AllowedExtensions`, and `AutoCreateDirectory`.
+- **`FileStorageSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Storage"`). Loaded from `appsettings.Storage.json`. Exposes `Provider`, `BasePath`, `EnablePublicAccess`, `MaxFileSizeBytes`, `AllowedExtensions`, and `AutoCreateDirectory`.
+- **`FileRegistryEntry`** — Entity mapping an opaque random identifier (`DefaultId` / Ulid) to an internal storage path with optional expiry.
+- **`IFileRegistry` / `DbFileRegistry`** — Abstraction and EF Core implementation for registering, resolving, and revoking opaque public file IDs.
+- **`FilesController`** (`Kernel/Storage/Controllers/`) — Public API controller (`GET /files/{id}`) serving files by their registered opaque identifier. Features automatic MIME detection, HTTP range processing, and optional download attachment header.
 - **`StorageExtensions`** (`Kernel/Storage/Extensions/`) — Extension methods: `UploadAsync(path, byte[], ...)`, `DownloadBytesAsync(path, ...)`, `UploadTextAsync(path, text, ...)`, `DownloadTextAsync(path, ...)`, and `AddFileStorage()`.
-- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — Thread-safe in-memory test fake tracking stored files, deleted paths, call counters (`UploadCount`, `DownloadCount`, `DeleteCount`), and failure simulation flags (`SimulateFailureOnUpload`, `SimulateFailureOnDownload`, `SimulateFailureOnDelete`).
+- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — Thread-safe in-memory test fake tracking stored files, deleted paths, call counters (`UploadCount`, `DownloadCount`, `DeleteCount`), failure simulation flags, and `Registry` (`FakeFileRegistry`).
+- **`FakeFileRegistry`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `IFileRegistry`.
 - **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `storage.ShouldHaveFile(path)`, `storage.ShouldHaveFile(path, bytes)`, `storage.ShouldHaveFile(path, text)`, `storage.ShouldNotHaveFile(path)`, `storage.ShouldHaveDeleted(path)`, `storage.ShouldBeEmpty()`, `storage.ShouldHaveCount(count)`.
 
-> **Convention:** Inject `IFileStorage` into services or handlers needing file persistence. Use extension methods (`UploadTextAsync`, `DownloadBytesAsync`) for convenient serialization. In tests, use `fixture.FileStorage` and assert with `fixture.FileStorage.ShouldHaveFile(...)`.
+> **Convention:** Inject `IFileStorage` into services or handlers needing file persistence. Use extension methods (`UploadTextAsync`, `DownloadBytesAsync`) for convenient serialization. When generating public URLs, `GetUrlAsync` associates an opaque random identifier in `IFileRegistry` returning `/files/{id}` to obscure internal directory organization. Public file requests are served via `FilesController` (mapped via `app.MapControllers()`). In tests, use `fixture.FileStorage` and assert with `fixture.FileStorage.ShouldHaveFile(...)`.
 
 ### Real-Time Notifications (`Kernel/Notifications/`)
 A real-time notification abstraction backed by ASP.NET Core SignalR, configurable via dynamic settings, targeting individual users, named groups, or all connected clients:

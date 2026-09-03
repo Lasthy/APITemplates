@@ -471,15 +471,19 @@ A unified file and blob storage subsystem with a local filesystem provider, runt
 - **`FileStorageSettings`** — `DynamicSettingsSection` subclass (`SectionName => "Storage"`). Loaded from `appsettings.Storage.json`. Exposes:
   - `Provider` (`string`, default: `"Local"`).
   - `BasePath` (`string`, default: `"./storage"`).
-  - `BaseUrl` (`string`, default: `"/files"`).
+  - `EnablePublicAccess` (`bool`, default: `true`).
   - `MaxFileSizeBytes` (`long`, default: `10485760` / 10MB; 0 = unlimited).
   - `AllowedExtensions` (`IReadOnlyList<string>`, default: `[]`).
   - `AutoCreateDirectory` (`bool`, default: `true`).
+- **`FileRegistryEntry`** — Entity mapping an opaque random identifier (`DefaultId` / Ulid) to an internal storage path with optional expiry.
+- **`IFileRegistry` / `DbFileRegistry`** — Abstraction and EF Core implementation for registering, resolving, and revoking opaque public file IDs.
+- **`FilesController`** (`Kernel/Storage/Controllers/`) — Public API controller (`GET /files/{id}`) serving files by their registered opaque identifier. Features automatic MIME detection, HTTP range processing, and optional download attachment header.
 - **`StorageExtensions`** (`Kernel/Storage/Extensions/`) — Extension methods:
   - `storage.UploadAsync(path, byte[], ...)` / `storage.DownloadBytesAsync(path, ...)`
   - `storage.UploadTextAsync(path, text, ...)` / `storage.DownloadTextAsync(path, ...)`
-  - `services.AddFileStorage()` — Registers `IFileStorage` -> `LocalFileStorage`.
-- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — Thread-safe in-memory test fake tracking stored files, deleted paths, call counters (`UploadCount`, `DownloadCount`, `DeleteCount`), and failure simulation flags (`SimulateFailureOnUpload`, `SimulateFailureOnDownload`, `SimulateFailureOnDelete`).
+  - `services.AddFileStorage()` — Registers `IFileRegistry` -> `DbFileRegistry` and `IFileStorage` -> `LocalFileStorage`.
+- **`FakeFileStorage`** (`Kernel.Testing/Fakes/`) — Thread-safe in-memory test fake tracking stored files, deleted paths, call counters (`UploadCount`, `DownloadCount`, `DeleteCount`), failure simulation flags, and `Registry` (`FakeFileRegistry`).
+- **`FakeFileRegistry`** (`Kernel.Testing/Fakes/`) — In-memory test fake implementing `IFileRegistry`.
 - **`FileStorageAssertions`** (`Kernel.Testing/Assertions/`) — Fluent assertions: `storage.ShouldHaveFile(path)`, `storage.ShouldHaveFile(path, bytes)`, `storage.ShouldHaveFile(path, text)`, `storage.ShouldNotHaveFile(path)`, `storage.ShouldHaveDeleted(path)`, `storage.ShouldBeEmpty()`, `storage.ShouldHaveCount(count)`.
 
 #### Real-Time Notifications (`Kernel/Notifications/`)

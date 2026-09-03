@@ -11,7 +11,7 @@ public class FileStorageSettings : DynamicSettingsSection
 {
     private const string DefaultProvider = "Local";
     private const string DefaultBasePath = "./storage";
-    private const string DefaultBaseUrl = "/files";
+    private const bool DefaultEnablePublicAccess = true;
     private const long DefaultMaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
     /// <inheritdoc />
@@ -31,10 +31,10 @@ public class FileStorageSettings : DynamicSettingsSection
         TryGetValue<string>(nameof(BasePath), out var val) && !string.IsNullOrWhiteSpace(val) ? val : DefaultBasePath;
 
     /// <summary>
-    /// The public or relative base URL prefix for generating file URLs.
+    /// Whether public file retrieval via generated file URLs is enabled.
     /// </summary>
-    public string BaseUrl =>
-        TryGetValue<string>(nameof(BaseUrl), out var val) && val is not null ? val : DefaultBaseUrl;
+    public bool EnablePublicAccess =>
+        !TryGetValue<bool>(nameof(EnablePublicAccess), out var val) || val;
 
     /// <summary>
     /// Maximum allowed file size in bytes for uploads. Set to 0 to disable size checks.

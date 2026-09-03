@@ -57,7 +57,7 @@ public class SecurityTests : ModuleTestBase<IdentityModule, IdentityModuleDbCont
     public async Task UpdateSettings_BlocksMaskedPlaceholderValues()
     {
         using var doc = JsonDocument.Parse("\"******\"");
-        var result = await Dispatcher.DispatchAsync(new UpdateSettings("Storage", "BaseUrl", doc.RootElement.Clone()));
+        var result = await Dispatcher.DispatchAsync(new UpdateSettings("Storage", "BasePath", doc.RootElement.Clone()));
 
         result.ShouldBeFailure();
         Assert.Contains("Cannot set masked placeholder value", result.Error?.Message);

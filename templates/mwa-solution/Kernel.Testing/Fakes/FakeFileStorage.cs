@@ -89,9 +89,14 @@ public class FakeFileStorage : IFileStorage
     public bool SimulateFailureOnDelete { get; set; }
 
     /// <summary>
-    /// Base URL used for <see cref="GetUrlAsync"/>. Defaults to "/files".
+    /// The associated file registry. Defaults to an in-memory <see cref="FakeFileRegistry"/>.
     /// </summary>
-    public string BaseUrl { get; set; } = "/files";
+    public IFileRegistry Registry { get; set; } = new FakeFileRegistry();
+
+    /// <summary>
+    /// Whether public file retrieval via generated file URLs is enabled. Defaults to true.
+    /// </summary>
+    public bool EnablePublicAccess { get; set; } = true;
 
     /// <inheritdoc />
     public async Task<Result<string>> UploadAsync(
@@ -156,7 +161,7 @@ public class FakeFileStorage : IFileStorage
     }
 
     /// <inheritdoc />
-    public Task<Result> DeleteAsync(string path, CancellationToken ct = default)
+    public async Task<Result> DeleteAsync(string path, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(path);
 
@@ -167,7 +172,7 @@ public class FakeFileStorage : IFileStorage
 
         if (SimulateFailureOnDelete)
         {
-            return Task.FromResult(Result.Failure(new InvalidOperationException("Simulated delete failure.")));
+            return Result.Failure(new InvalidOperationException("Simulated delete failure."));
         }
 
         var normalizedPath = NormalizePath(path);
@@ -178,20 +183,36 @@ public class FakeFileStorage : IFileStorage
             _deletedPaths.Add(normalizedPath);
         }
 
-        return Task.FromResult(Result.Success());
+        await Registry.RevokeByPathAsync(normalizedPath, ct);
+        return Result.Success();
     }
 
     /// <inheritdoc />
-    public Task<Result<string>> GetUrlAsync(string path, TimeSpan? expiry = null, CancellationToken ct = default)
+    public async Task<Result<string>> GetUrlAsync(string path, TimeSpan? expiry = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        var normalizedPath = NormalizePath(path);
-        var url = string.IsNullOrWhiteSpace(BaseUrl)
-            ? $"/{normalizedPath}"
-            : $"{BaseUrl.TrimEnd('/')}/{normalizedPath}";
+        if (!EnablePublicAccess)
+        {
+            return Result.Failure<string>(new InvalidOperationException("Public file access is disabled in storage settings."));
+        }
 
-        return Task.FromResult(Result.Success<string>(url));
+        var normalizedPath = NormalizePath(path);
+        lock (_lock)
+        {
+            if (!_files.ContainsKey(normalizedPath))
+            {
+                return Result.Failure<string>(new FileNotFoundException($"File not found at '{normalizedPath}'.", normalizedPath));
+            }
+        }
+
+        var regResult = await Registry.RegisterAsync(normalizedPath, expiry, ct);
+        if (regResult.IsFailure)
+        {
+            return Result.Failure<string>(regResult.Error!);
+        }
+
+        return Result.Success<string>($"/files/{regResult.Value}");
     }
 
     /// <inheritdoc />
@@ -259,6 +280,8 @@ public class FakeFileStorage : IFileStorage
             SimulateFailureOnDownload = false;
             SimulateFailureOnDelete = false;
         }
+
+        (Registry as FakeFileRegistry)?.Clear();
     }
 
     private static string NormalizePath(string path)

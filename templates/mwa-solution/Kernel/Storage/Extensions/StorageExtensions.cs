@@ -101,10 +101,12 @@ public static class StorageExtensions
     }
 
     /// <summary>
-    /// Registers <see cref="IFileStorage"/> implementation with <see cref="LocalFileStorage"/> default.
+    /// Registers <see cref="IFileStorage"/> implementation with <see cref="LocalFileStorage"/> default,
+    /// and <see cref="IFileRegistry"/> with <see cref="DbFileRegistry"/>.
     /// </summary>
     public static IServiceCollection AddFileStorage(this IServiceCollection services)
     {
+        services.TryAddSingleton<IFileRegistry, DbFileRegistry>();
         services.TryAddSingleton<IFileStorage, LocalFileStorage>();
         return services;
     }

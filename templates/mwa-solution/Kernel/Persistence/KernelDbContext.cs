@@ -1,6 +1,7 @@
 using Kernel.AuditLog;
 using Kernel.Messaging;
 using Kernel.Persistence.Extensions;
+using Kernel.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kernel.Persistence;
@@ -27,6 +28,11 @@ public class KernelDbContext : DbContext, IDbContextSchema
     /// Structured audit log entries.
     /// </summary>
     public DbSet<AuditEntry> AuditEntries { get; set; } = null!;
+
+    /// <summary>
+    /// Public file registry entries mapping opaque IDs to storage paths.
+    /// </summary>
+    public DbSet<FileRegistryEntry> FileRegistry { get; set; } = null!;
 
     public KernelDbContext(DbContextOptions<KernelDbContext> options) : base(options)
     {
@@ -89,6 +95,17 @@ public class KernelDbContext : DbContext, IDbContextSchema
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.OccurredAt);
             entity.HasIndex(e => e.CorrelationId);
+        });
+
+        modelBuilder.Entity<FileRegistryEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(26);
+            entity.Property(e => e.Path).HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+
+            entity.HasIndex(e => e.Path);
+            entity.HasIndex(e => e.ExpiresAt);
         });
     }
 }

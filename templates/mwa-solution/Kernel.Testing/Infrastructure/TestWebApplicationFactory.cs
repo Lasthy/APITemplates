@@ -94,6 +94,9 @@ public class TestWebApplicationFactory<TProgram> : WebApplicationFactory<TProgra
             services.AddSingleton<IFileStorage>(FileStorage);
             services.AddSingleton(FileStorage);
 
+            services.RemoveAll<IFileRegistry>();
+            services.AddSingleton<IFileRegistry>(FileStorage.Registry);
+
             services.RemoveAll<INotificationService>();
             services.AddSingleton<INotificationService>(NotificationService);
             services.AddSingleton(NotificationService);
