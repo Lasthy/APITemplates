@@ -9,10 +9,13 @@
     <Project Path="Modules/MultiTenancy.Contracts/MultiTenancy.Contracts.csproj" />
     <Project Path="Modules/Scheduling/Scheduling.csproj" />
     <Project Path="Modules/Scheduling.Contracts/Scheduling.Contracts.csproj" />
+    <Project Path="Modules/Cms/Cms.csproj" />
+    <Project Path="Modules/Cms.Contracts/Cms.Contracts.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="Tests/Identity.Tests/Identity.Tests.csproj" />
     <Project Path="Tests/MultiTenancy.Tests/MultiTenancy.Tests.csproj" />
     <Project Path="Tests/Scheduling.Tests/Scheduling.Tests.csproj" />
+    <Project Path="Tests/Cms.Tests/Cms.Tests.csproj" />
   </Folder>
 </Solution>

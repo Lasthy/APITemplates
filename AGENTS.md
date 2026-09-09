@@ -9,8 +9,9 @@ This repository contains `dotnet new` templates for building **Modular Web API**
 | **Modular API Identity Module** | `mwa-module-identity` | Project | `templates/mwa-module-identity/` |
 | **Modular API Multi-Tenancy Module** | `mwa-module-multitenancy` | Project | `templates/mwa-module-multitenancy/` |
 | **Modular API Scheduling Module** | `mwa-module-scheduling` | Project | `templates/mwa-module-scheduling/` |
+| **Modular API CMS Module** | `mwa-module-cms` | Project | `templates/mwa-module-cms/` |
 
-The solution template scaffolds the **Host** (entry-point web app) and the **Kernel** (shared library). The module templates scaffold module projects that plug into the solution (`mwa-module` for generic features, `mwa-module-identity` for identity/auth, `mwa-module-multitenancy` for multi-tenancy, `mwa-module-scheduling` for job scheduling).
+The solution template scaffolds the **Host** (entry-point web app) and the **Kernel** (shared library). The module templates scaffold module projects that plug into the solution (`mwa-module` for generic features, `mwa-module-identity` for identity/auth, `mwa-module-multitenancy` for multi-tenancy, `mwa-module-scheduling` for job scheduling, `mwa-module-cms` for headless content management).
 
 ---
 

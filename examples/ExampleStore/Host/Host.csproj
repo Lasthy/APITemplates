@@ -17,6 +17,7 @@
     <ProjectReference Include="..\Modules\Identity\Identity.csproj" />
     <ProjectReference Include="..\Modules\MultiTenancy\MultiTenancy.csproj" />
     <ProjectReference Include="..\Modules\Scheduling\Scheduling.csproj" />
+    <ProjectReference Include="..\Modules\Cms\Cms.csproj" />
   </ItemGroup>
 
 </Project>
