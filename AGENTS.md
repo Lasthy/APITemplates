@@ -7,8 +7,9 @@ This repository contains `dotnet new` templates for building **Modular Web API**
 | **Modular API Solution** | `modular-webapi` | Solution | `templates/mwa-solution/` |
 | **Modular API Module** | `modular-webapi-module` | Project | `templates/mwa-module/` |
 | **Modular API Identity Module** | `mwa-module-identity` | Project | `templates/mwa-module-identity/` |
+| **Modular API Multi-Tenancy Module** | `mwa-module-multitenancy` | Project | `templates/mwa-module-multitenancy/` |
 
-The solution template scaffolds the **Host** (entry-point web app) and the **Kernel** (shared library). The module templates scaffold module projects that plug into the solution (`mwa-module` for generic features, `mwa-module-identity` for identity/auth).
+The solution template scaffolds the **Host** (entry-point web app) and the **Kernel** (shared library). The module templates scaffold module projects that plug into the solution (`mwa-module` for generic features, `mwa-module-identity` for identity/auth, `mwa-module-multitenancy` for multi-tenancy).
 
 ---
 

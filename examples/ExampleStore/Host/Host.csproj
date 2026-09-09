@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Kernel\Kernel.csproj" />
     <ProjectReference Include="..\Modules\Identity\Identity.csproj" />
+    <ProjectReference Include="..\Modules\MultiTenancy\MultiTenancy.csproj" />
   </ItemGroup>
 
 </Project>
