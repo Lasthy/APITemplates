@@ -11,11 +11,14 @@
     <Project Path="Modules/Scheduling.Contracts/Scheduling.Contracts.csproj" />
     <Project Path="Modules/Cms/Cms.csproj" />
     <Project Path="Modules/Cms.Contracts/Cms.Contracts.csproj" />
+    <Project Path="Modules/Webhooks/Webhooks.csproj" />
+    <Project Path="Modules/Webhooks.Contracts/Webhooks.Contracts.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="Tests/Identity.Tests/Identity.Tests.csproj" />
     <Project Path="Tests/MultiTenancy.Tests/MultiTenancy.Tests.csproj" />
     <Project Path="Tests/Scheduling.Tests/Scheduling.Tests.csproj" />
     <Project Path="Tests/Cms.Tests/Cms.Tests.csproj" />
+    <Project Path="Tests/Webhooks.Tests/Webhooks.Tests.csproj" />
   </Folder>
 </Solution>

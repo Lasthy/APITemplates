@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Modules\MultiTenancy\MultiTenancy.csproj" />
     <ProjectReference Include="..\Modules\Scheduling\Scheduling.csproj" />
     <ProjectReference Include="..\Modules\Cms\Cms.csproj" />
+    <ProjectReference Include="..\Modules\Webhooks\Webhooks.csproj" />
   </ItemGroup>
 
 </Project>

@@ -10,23 +10,40 @@ public sealed class InProcessEventBus(IServiceProvider serviceProvider) : IEvent
 {
     /// <summary>
     /// Publishes an event instance to all subscribed handlers.
+    /// Supports polymorphic dispatching to handlers registered for the event's concrete type,
+    /// base classes, and implemented event interfaces.
     /// </summary>
     public async Task PublishAsync<T>(T @event, CancellationToken cancellationToken = default)
         where T : IEvent
     {
-        var eventType = @event.GetType();
-        var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
-        var handlers = serviceProvider.GetServices(handlerType);
+        var executedHandlers = new HashSet<object>();
+        var currentType = @event.GetType();
+        var typesToQuery = new List<Type>();
 
-        foreach (var handler in handlers)
+        for (var type = currentType; type != null && typeof(IEvent).IsAssignableFrom(type); type = type.BaseType)
         {
-            if (handler != null)
+            typesToQuery.Add(type);
+        }
+        foreach (var iface in currentType.GetInterfaces().Where(i => typeof(IEvent).IsAssignableFrom(i)))
+        {
+            typesToQuery.Add(iface);
+        }
+
+        foreach (var targetType in typesToQuery.Distinct())
+        {
+            var handlerType = typeof(IEventHandler<>).MakeGenericType(targetType);
+            var handlers = serviceProvider.GetServices(handlerType);
+
+            foreach (var handler in handlers)
             {
-                var method = handlerType.GetMethod(nameof(IEventHandler<T>.HandleAsync));
-                if (method != null)
+                if (handler != null && executedHandlers.Add(handler))
                 {
-                    var task = (Task)method.Invoke(handler, [@event, cancellationToken])!;
-                    await task;
+                    var method = handlerType.GetMethod(nameof(IEventHandler<T>.HandleAsync));
+                    if (method != null)
+                    {
+                        var task = (Task)method.Invoke(handler, [@event, cancellationToken])!;
+                        await task;
+                    }
                 }
             }
         }

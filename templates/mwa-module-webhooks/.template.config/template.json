@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Lasthy",
+  "classifications": [
+    "Web",
+    "Web API",
+    "API",
+    "Webhooks",
+    "Project"
+  ],
+  "identity": "Lasthy.ModularAPI.Module.Webhooks",
+  "name": "Modular API Webhooks Module",
+  "shortName": "mwa-module-webhooks",
+  "defaultName": "Webhooks",
+  "preferNameDirectory": false,
+  "sourceName": "Webhooks",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/[Bb]in/**",
+            "**/[Oo]bj/**",
+            ".vs/**",
+            "**/*.user",
+            "**/*.lock.json",
+            ".git/**"
+          ]
+        }
+      ]
+    }
+  ]
+}
