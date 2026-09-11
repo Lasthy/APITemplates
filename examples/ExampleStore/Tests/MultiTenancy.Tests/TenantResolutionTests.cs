@@ -146,6 +146,6 @@ public class TenantResolutionTests
 
     private class RoutingFeature : IRoutingFeature
     {
-        public RouteData RouteData { get; set; } = new();
+        public RouteData? RouteData { get; set; } = new();
     }
 }

@@ -15,6 +15,7 @@
     <Project Path="Modules/Webhooks.Contracts/Webhooks.Contracts.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="Tests/Kernel.Tests/Kernel.Tests.csproj" />
     <Project Path="Tests/Identity.Tests/Identity.Tests.csproj" />
     <Project Path="Tests/MultiTenancy.Tests/MultiTenancy.Tests.csproj" />
     <Project Path="Tests/Scheduling.Tests/Scheduling.Tests.csproj" />

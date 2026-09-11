@@ -57,6 +57,9 @@ Solution Root (MyAPI.slnx)
 ├── Modules/                 # Directory where module projects live
 │   ├── {ModuleName}/        # Module implementation (domain logic, handlers, endpoints, DbContext)
 │   └── {ModuleName}.Contracts/ # Companion public contracts (events, requests, DTOs)
+├── Tests/                   # Test suites directory
+│   ├── Kernel.Tests/        # Kernel unit and integration tests
+│   └── {ModuleName}.Tests/  # Module test suites (auto-scaffolded alongside modules)
 ├── create-module.ps1        # Helper script to scaffold, sln-add, and Host-reference a new module (PowerShell)
 ├── create-module.sh         # Helper script to scaffold, sln-add, and Host-reference a new module (Bash)
 ├── GlobalUsings.Shared.cs   # `global using DefaultId = System.Ulid;`

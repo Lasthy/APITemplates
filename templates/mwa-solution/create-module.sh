@@ -27,7 +27,26 @@ fi
 echo "Creating module '$MODULE_NAME' (with companion '$MODULE_NAME.Contracts')..."
 (
     cd "$SCRIPT_DIR"
-    dotnet new mwa-module -n "$MODULE_NAME"
+    case "$MODULE_NAME" in
+        Identity)
+            dotnet new mwa-module-identity
+            ;;
+        MultiTenancy)
+            dotnet new mwa-module-multitenancy
+            ;;
+        Scheduling)
+            dotnet new mwa-module-scheduling
+            ;;
+        Cms)
+            dotnet new mwa-module-cms
+            ;;
+        Webhooks)
+            dotnet new mwa-module-webhooks
+            ;;
+        *)
+            dotnet new mwa-module -n "$MODULE_NAME"
+            ;;
+    esac
 
     SLN_FILE=$(find "$SCRIPT_DIR" -maxdepth 1 \( -name "*.slnx" -o -name "*.sln" \) | head -n 1)
 
@@ -44,13 +63,30 @@ echo "Creating module '$MODULE_NAME' (with companion '$MODULE_NAME.Contracts')..
         fi
     fi
 
+    TEST_CSPROJ="$SCRIPT_DIR/Tests/$MODULE_NAME.Tests/$MODULE_NAME.Tests.csproj"
+    if [ -f "$TEST_CSPROJ" ]; then
+        echo "Adding '$MODULE_NAME.Tests' to solution under Tests folder..."
+        if [ -n "$SLN_FILE" ]; then
+            dotnet sln "$SLN_FILE" add "$TEST_CSPROJ" -s "Tests"
+        else
+            dotnet sln add "$TEST_CSPROJ" -s "Tests"
+        fi
+    fi
+
     if [ -f "$HOST_CSPROJ" ]; then
         echo "Adding project reference to Host..."
         dotnet add "$HOST_CSPROJ" reference "$MODULE_CSPROJ"
     else
         echo "Warning: Host project not found at '$HOST_CSPROJ'. Skipping reference addition."
     fi
+
+    INSTANCE_SETTINGS="$SCRIPT_DIR/Host/appsettings.Instance.json"
+    if [ -f "$INSTANCE_SETTINGS" ]; then
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c "import json; p='$INSTANCE_SETTINGS'; f=open(p,'r'); d=json.load(f); f.close(); d.setdefault('ActiveModules',{})['$MODULE_NAME']=True; f=open(p,'w'); json.dump(d,f,indent=2); f.close()"
+            echo "Enabled '$MODULE_NAME' in Host/appsettings.Instance.json."
+        fi
+    fi
 )
 
 echo "Module '$MODULE_NAME' (and '$MODULE_NAME.Contracts') created and configured successfully!"
-echo "Remember to enable '$MODULE_NAME' in Host/appsettings.Instance.json if required."

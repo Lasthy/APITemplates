@@ -11,9 +11,6 @@
   "identity": "Lasthy.ModularAPI.Module.MultiTenancy",
   "name": "Modular API Multi-Tenancy Module",
   "shortName": "mwa-module-multitenancy",
-  "defaultName": "MultiTenancy",
-  "preferNameDirectory": false,
-  "sourceName": "MultiTenancy",
   "tags": {
     "language": "C#",
     "type": "project"

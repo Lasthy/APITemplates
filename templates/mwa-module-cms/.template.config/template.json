@@ -11,9 +11,6 @@
   "identity": "Lasthy.ModularAPI.Module.Cms",
   "name": "Modular API CMS Module",
   "shortName": "mwa-module-cms",
-  "defaultName": "Cms",
-  "preferNameDirectory": false,
-  "sourceName": "Cms",
   "tags": {
     "language": "C#",
     "type": "project"

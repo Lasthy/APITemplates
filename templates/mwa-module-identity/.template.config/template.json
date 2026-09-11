@@ -11,9 +11,6 @@
   "identity": "Lasthy.ModularAPI.Module.Identity",
   "name": "Modular API Identity Module",
   "shortName": "mwa-module-identity",
-  "defaultName": "Identity",
-  "preferNameDirectory": false,
-  "sourceName": "Identity",
   "tags": {
     "language": "C#",
     "type": "project"

@@ -11,9 +11,6 @@
   "identity": "Lasthy.ModularAPI.Module.Scheduling",
   "name": "Modular API Scheduling Module",
   "shortName": "mwa-module-scheduling",
-  "defaultName": "Scheduling",
-  "preferNameDirectory": false,
-  "sourceName": "Scheduling",
   "tags": {
     "language": "C#",
     "type": "project"

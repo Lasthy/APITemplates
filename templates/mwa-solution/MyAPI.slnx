@@ -2,4 +2,7 @@
   <Project Path="Host/Host.csproj" />
   <Project Path="Kernel/Kernel.csproj" />
   <Project Path="Kernel.Testing/Kernel.Testing.csproj" />
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Kernel.Tests/Kernel.Tests.csproj" />
+  </Folder>
 </Solution>
